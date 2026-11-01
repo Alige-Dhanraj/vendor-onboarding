@@ -126,7 +126,7 @@ function OutcomeBanner({ run, status, running, checks }: { run: any; status: str
     return <Card className="p-5"><div className="flex items-center gap-3 text-sm text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-indigo-500 pulse" />Processing… each stage appears on the left as it finishes.</div></Card>;
   }
   const tone = { APPROVED: "border-emerald-200 bg-emerald-50/60", PENDING_INFO: "border-amber-200 bg-amber-50/60", MANUAL_REVIEW: "border-orange-200 bg-orange-50/60", REJECTED: "border-rose-200 bg-rose-50/60", FAILED: "border-rose-200 bg-rose-50/60" }[status] ?? "";
-  const flagged = checks.filter((c) => c.status === "FAIL");
+  const flagged = checks.filter((c) => c.status === "FAIL" && !(run.headline ?? "").includes(c.reason));
   const counts = ["PASS", "FAIL", "WARN", "UNVERIFIED"].map((s) => [s, checks.filter((c) => c.status === s).length] as const);
   return (
     <div className={`rounded-xl border p-5 ${tone}`}>
