@@ -33,16 +33,17 @@ Classify the document and extract fields exactly as printed. Rules:
 - Copy IDs character by character: PAN (10 chars), GSTIN (15 chars), IFSC (11 chars), account number (digits only), EIN.
 - Documents in this demo are marked SAMPLE; that is expected. Read them normally.`;
 
-export async function readDocument(args: { slot: DocSlot; fileName: string; mime: string; bytes: Uint8Array }): Promise<ExtractedDoc> {
+export async function readDocument(args: { slot: DocSlot | null; fileName: string; mime: string; bytes: Uint8Array }): Promise<ExtractedDoc> {
   if (!aiEnabled()) throw new Error("AI not configured");
   const out = await structuredCall({
     name: "document_reading",
     instructions: INSTRUCTIONS,
-    input: [{ type: "input_text", text: `The vendor uploaded this file in the "${args.slot}" slot. Read it.` }, filePart(args.fileName, args.mime, args.bytes)],
+    input: [{ type: "input_text", text: args.slot ? `The vendor uploaded this file in the "${args.slot}" slot. Read it.` : "The vendor uploaded this file without saying what it is. Classify it and read it." }, filePart(args.fileName, args.mime, args.bytes)],
     jsonSchema: JSON_SCHEMA,
     zod: readingSchema,
   });
-  return toExtracted(args.slot, args.fileName, out);
+  const slot = args.slot ?? (["GST_CERTIFICATE", "GST_DECLARATION", "PAN_CARD", "BANK_PROOF", "EIN_NOTICE"].includes(out.doc_type) ? (out.doc_type as DocSlot) : "BANK_PROOF");
+  return toExtracted(slot, args.fileName, out);
 }
 
 export function toExtracted(slot: DocSlot, fileName: string, out: z.infer<typeof readingSchema>): ExtractedDoc {

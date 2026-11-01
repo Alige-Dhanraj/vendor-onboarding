@@ -77,6 +77,24 @@ export default function Dashboard({ initialFilter = "all", title }: { initialFil
         ))}
       </div>
 
+      {data.issues?.length > 0 && (
+        <Card className="p-5">
+          <div className="mb-3 flex items-baseline justify-between"><h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Why vendors get stuck</h2><span className="text-xs text-slate-500">share of finished runs where each check flagged</span></div>
+          <div className="space-y-2">
+            {data.issues.slice(0, 6).map((i: any) => {
+              const pct = done ? Math.round((i.runs / done) * 100) : 0;
+              return (
+                <div key={i.check_id} className="grid grid-cols-[220px_1fr_48px] items-center gap-3 text-sm">
+                  <span className="truncate text-slate-700">{i.title}</span>
+                  <div className="h-2.5 rounded-full bg-slate-100"><div className="h-2.5 rounded-full bg-slate-700" style={{ width: `${Math.max(4, pct)}%` }} /></div>
+                  <span className="text-right tabular-nums text-slate-600">{pct}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <div className="flex flex-wrap gap-1 border-b border-slate-100 p-2">
           {FILTERS.map((f) => (

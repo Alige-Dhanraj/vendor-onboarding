@@ -70,6 +70,8 @@ export interface Store {
   getBlocklist(): Promise<BlocklistEntry[]>;
   getRegistry(): Promise<TestRegistry>;
 
+  issueCounts(): Promise<{ check_id: string; title: string; runs: number }[]>;
+
   // demo
   resetDemo(seed: { vendors: VendorRecord[] }): Promise<void>;
 

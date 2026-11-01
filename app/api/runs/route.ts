@@ -7,7 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const runs = await getStore().listRuns(200);
+  const store = getStore();
+  const [runs, issues] = await Promise.all([store.listRuns(200), store.issueCounts()]);
   const done = runs.filter((r) => r.status !== "RUNNING");
   const effective = (r: (typeof runs)[number]) => r.final_status ?? r.internal_status;
   const count = (s: string) => done.filter((r) => effective(r) === s).length;
@@ -21,5 +22,5 @@ export async function GET() {
     avg_ms: durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0,
     auto_cleared: done.filter((r) => r.internal_status === "APPROVED").length,
   };
-  return NextResponse.json({ runs, stats, mode: { ai: aiMode(), store: storeMode() } });
+  return NextResponse.json({ runs, stats, issues, mode: { ai: aiMode(), store: storeMode() } });
 }

@@ -72,20 +72,14 @@ export default function RunView({ id }: { id: string }) {
         </Card>
 
         <div className="space-y-6">
-          <OutcomeBanner run={run} status={status} running={running} checks={checks} />
+          <OutcomeBanner run={run} status={status} running={running} checks={checks} message={message} email={form.contact?.email} vendorRef={submission.vendor_ref} version={submission.version} scenario={scenario} />
           {!running && run.review_flag && <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />}
-          {!running && (status === "PENDING_INFO") && (
-            <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <div className="text-sm text-slate-600">When the vendor sends corrected details, submit them as a new version. Every check re-runs; unchanged documents reuse their earlier reading.</div>
-              <Link className={btnSecondary} href={`/?vendor_ref=${encodeURIComponent(submission.vendor_ref)}${scenario?.resubmission ? `&scenario=${scenario.id}&v=2` : ""}`}>Resubmit as version {submission.version + 1}</Link>
-            </Card>
-          )}
           {checks.length > 0 && <Checks checks={checks} />}
         </div>
       </div>
 
       {documents.length > 0 && <Documents documents={documents} running={running} />}
-      {message && <Message message={message} />}
+      {message && <Message message={message} email={form.contact?.email} />}
     </div>
   );
 }
@@ -121,7 +115,19 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
   );
 }
 
-function OutcomeBanner({ run, status, running, checks }: { run: any; status: string; running: boolean; checks: CheckResult[] }) {
+function mailto(email: string | undefined, m: any) {
+  return `mailto:${encodeURIComponent(email ?? "")}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`;
+}
+
+const NEXT_STEP: Record<string, string> = {
+  APPROVED: "Nothing to do. The vendor is verified and added to the vendor master.",
+  PENDING_INFO: "Send the drafted message so the vendor can fix the items below.",
+  MANUAL_REVIEW: "A person should look at the evidence and decide.",
+  REJECTED: "Send the drafted notice. A hard-stop rule cannot be overridden here.",
+  FAILED: "The run could not finish. Please review the submission manually.",
+};
+
+function OutcomeBanner({ run, status, running, checks, message, email, vendorRef, version, scenario }: { run: any; status: string; running: boolean; checks: CheckResult[]; message: any; email?: string; vendorRef: string; version: number; scenario?: any }) {
   if (running) {
     return <Card className="p-5"><div className="flex items-center gap-3 text-sm text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-indigo-500 pulse" />Processing… each stage appears on the left as it finishes.</div></Card>;
   }
@@ -136,6 +142,13 @@ function OutcomeBanner({ run, status, running, checks }: { run: any; status: str
         <span className="ml-auto text-xs text-slate-500">{counts.map(([s, n]) => `${n} ${s.toLowerCase()}`).join(" · ")}</span>
       </div>
       <p className="mt-3 text-[15px] font-medium text-slate-900">{run.headline}</p>
+      <p className="mt-1 text-sm text-slate-600"><b>Next step:</b> {run.final_status ? "Decided by a reviewer; see the decision below." : NEXT_STEP[status]}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {message && (status === "PENDING_INFO" || status === "REJECTED" || run.final_status) && <a className={btnPrimary} href={mailto(email, message)}>Send to vendor</a>}
+        {status === "MANUAL_REVIEW" && !run.final_status && <a className={btnPrimary} href="#review">Review and decide</a>}
+        {status === "PENDING_INFO" && <Link className={btnSecondary} href={`/?vendor_ref=${encodeURIComponent(vendorRef)}${scenario?.resubmission ? `&scenario=${scenario.id}&v=2` : ""}`}>Resubmit as version {version + 1}</Link>}
+        {status === "APPROVED" && <Link className={btnSecondary} href="/">Next vendor</Link>}
+      </div>
       {flagged.length > 0 && (
         <ul className="mt-3 space-y-1 text-sm text-slate-700">
           {flagged.map((c) => <li key={c.id}><span className="mono text-xs text-slate-500">{c.id}</span> <b>{SEVERITY_LABEL[c.severity ?? ""]}</b>: {c.reason}</li>)}
@@ -146,22 +159,25 @@ function OutcomeBanner({ run, status, running, checks }: { run: any; status: str
 }
 
 function Checks({ checks }: { checks: CheckResult[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const quiet = (c: CheckResult) => c.status === "PASS" || c.status === "SKIPPED";
+  const passed = checks.filter(quiet).length;
   const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(checks.filter((c) => c.status !== "PASS" && c.status !== "SKIPPED").map((c) => [c.id, true])));
   const layers = ["COMPLETE", "VALID", "CONSISTENT", "CREDIBLE"];
   return (
     <Card className="p-5">
-      <SectionTitle hint="Click any check to see what was compared, from where, under which rule">Checks and evidence</SectionTitle>
+      <SectionTitle hint={<button type="button" className="text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show only problems" : `Show all ${checks.length} checks`}</button>}>Checks and evidence</SectionTitle>
+      {!showAll && <p className="mb-4 text-sm text-slate-600">✓ {passed} check{passed === 1 ? "" : "s"} passed or not applicable. {checks.length - passed ? `${checks.length - passed} need${checks.length - passed === 1 ? "s" : ""} attention:` : "Nothing needs attention."}</p>}
       <div className="space-y-5">
-        {layers.map((l) => (
+        {layers.filter((l) => showAll || checks.some((c) => c.layer === l && !quiet(c))).map((l) => (
           <div key={l}>
             <div className="mb-2 text-xs font-semibold text-slate-700">{LAYER_LABEL[l]}</div>
             <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {checks.filter((c) => c.layer === l).map((c) => (
+              {checks.filter((c) => c.layer === l && (showAll || !quiet(c))).map((c) => (
                 <div key={c.id}>
                   <button type="button" onClick={() => setOpen((p) => ({ ...p, [c.id]: !p[c.id] }))} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
                     <CheckBadge status={c.status} />
-                    <span className="mono w-7 text-xs text-slate-400">{c.id}</span>
-                    <span className="flex-1 text-sm text-slate-800">{c.title}</span>
+                    <span className="flex-1 text-sm text-slate-800">{c.title} <span className="mono ml-1 text-[11px] text-slate-400">{c.id}</span></span>
                     {c.severity && c.status !== "PASS" && <span className="text-xs text-slate-500">{SEVERITY_LABEL[c.severity]}</span>}
                     <span className="text-xs text-slate-400">{open[c.id] ? "−" : "+"}</span>
                   </button>
@@ -242,7 +258,7 @@ function Documents({ documents, running }: { documents: any[]; running: boolean 
   );
 }
 
-function Message({ message }: { message: any }) {
+function Message({ message, email }: { message: any; email?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Card className="p-5">
@@ -252,6 +268,7 @@ function Message({ message }: { message: any }) {
         <div className="border-b border-slate-100 px-4 py-2 text-sm"><span className="text-slate-500">Subject:</span> <span className="font-medium">{message.subject}</span></div>
         <pre className="whitespace-pre-wrap px-4 py-3 font-sans text-sm leading-relaxed text-slate-800">{message.body}</pre>
       </div>
+      <a className={`${btnPrimary} mt-3 mr-2`} href={mailto(email, message)}>Send to vendor</a>
       <button type="button" className={`${btnSecondary} mt-3`} onClick={() => { navigator.clipboard.writeText(`Subject: ${message.subject}\n\n${message.body}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
         {copied ? "Copied" : "Copy message"}
       </button>
@@ -273,7 +290,7 @@ function ReviewPanel({ run, actions, onDone }: { run: any; actions: any[]; onDon
     onDone();
   };
   return (
-    <Card className="border-orange-200 p-5">
+    <Card className="border-orange-200 p-5"><div id="review" className="-mt-24 pt-24" />
       <SectionTitle hint="Your decision and reason are saved to the audit log">Reviewer decision</SectionTitle>
       {actions.length > 0 ? (
         <ul className="space-y-2 text-sm">

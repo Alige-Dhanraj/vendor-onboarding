@@ -86,6 +86,14 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
     async getBlocklist() { return seed.blocklist; },
     async getRegistry() { return seed.registry; },
 
+    async issueCounts() {
+      const m = new Map<string, { check_id: string; title: string; runs: Set<string> }>();
+      for (const c of checks.filter((x) => x.status === "FAIL")) {
+        const e = m.get(c.id) ?? { check_id: c.id, title: c.title, runs: new Set<string>() };
+        e.runs.add(c.run_id); m.set(c.id, e);
+      }
+      return [...m.values()].map((e) => ({ check_id: e.check_id, title: e.title, runs: e.runs.size })).sort((a, b) => b.runs - a.runs);
+    },
     async resetDemo({ vendors: seedVendors }) {
       subs.length = 0; docs.length = 0; runs.length = 0; events.length = 0; checks.length = 0; messages.length = 0; actions.length = 0;
       vendors.length = 0; vendors.push(...seedVendors.map((v) => ({ ...v }))); runNo = 0;

@@ -117,6 +117,12 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       return Object.fromEntries(rows.map((r) => [r.gstin, { status: r.status, legal_name: r.legal_name }])) as TestRegistry;
     },
 
+    async issueCounts() {
+      const rows = must(await db.from("check_results").select("check_id, title, run_id").eq("status", "FAIL").limit(5000), "issue counts") as { check_id: string; title: string; run_id: string }[];
+      const m = new Map<string, { check_id: string; title: string; runs: Set<string> }>();
+      for (const r of rows) { const e = m.get(r.check_id) ?? { check_id: r.check_id, title: r.title, runs: new Set<string>() }; e.runs.add(r.run_id); m.set(r.check_id, e); }
+      return [...m.values()].map((e) => ({ check_id: e.check_id, title: e.title, runs: e.runs.size })).sort((a, b) => b.runs - a.runs);
+    },
     async resetDemo({ vendors }) {
       // Deletes all submissions (runs, events, checks, messages, reviewer actions cascade) and restores the seed vendors.
       must(await db.from("submissions").delete().not("id", "is", null), "clear submissions");

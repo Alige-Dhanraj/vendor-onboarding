@@ -32,13 +32,14 @@ export interface RunOptions {
 }
 
 export function aiMode() { return aiEnabled() ? "openai" : "offline"; }
+export const readCacheKey = (slot: string, hash: string) => `read:${aiMode() === "openai" ? aiModel() : "offline"}:${slot}:${hash}`;
 
 /**
  * Reads one document: cache by file hash first; then the AI; offline (no key) uses the scenario's
  * known reading if this is a sample document, otherwise marks it unreadable rather than guessing.
  */
 async function readOne(store: Store, doc: DocumentRow, scenarioId: string | null): Promise<{ reading: ExtractedDoc; via: string }> {
-  const key = `read:${aiMode() === "openai" ? aiModel() : "offline"}:${doc.slot}:${doc.file_hash}`;
+  const key = readCacheKey(doc.slot, doc.file_hash ?? "");
   const cached = doc.file_hash ? await store.cacheGet<ExtractedDoc>(key) : null;
   if (cached) return { reading: { ...cached, slot: doc.slot, file_name: doc.file_name }, via: "cached reading" };
 
