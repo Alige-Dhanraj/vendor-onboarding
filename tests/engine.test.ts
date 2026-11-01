@@ -162,3 +162,11 @@ test("the plain-English catalogue lists exactly the checks the engine runs", asy
   const ids = runChecks(ctxFor(SCENARIOS[0])).map((r) => r.id);
   assert.deepEqual(CATALOGUE.map((c) => c.id), ids);
 });
+
+test("O/0 misreads are corrected only where the ID format fixes the character type", async () => {
+  const { fixFixedPositions } = await import("../lib/engine/ids");
+  assert.equal(fixFixedPositions("DEM00002211", "ifsc"), "DEMO0002211");
+  assert.equal(fixFixedPositions("AABCK482IL", "pan"), "AABCK4821L");
+  assert.equal(fixFixedPositions("33AABCK4821L1ZM", "gstin"), "33AABCK4821L1ZM");
+  assert.equal(fixFixedPositions("DEMO0VATVAX", "ifsc"), "DEMO0VATVAX"); // branch part (X) left alone
+});

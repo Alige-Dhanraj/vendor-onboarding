@@ -106,3 +106,23 @@ export function hashAccount(acct: string): string {
 
 export const last4 = (acct: string) => (acct ?? "").replace(/\D/g, "").slice(-4);
 export const mask = (acct: string) => (acct ? "••••" + last4(acct) : "");
+
+/**
+ * Fixes letter-O / zero (and I / 1) misreads at positions whose type is fixed by the ID format.
+ * Pattern: A = letter, 9 = digit, 0 = the literal zero, X = any. Returns the corrected value.
+ */
+const PATTERNS = { pan: "AAAAA9999A", ifsc: "AAAA0XXXXXX", gstin: "99AAAAA9999AXZX" } as const;
+export function fixFixedPositions(value: string, kind: keyof typeof PATTERNS): string {
+  const v = clean(value);
+  const p = PATTERNS[kind];
+  if (v.length !== p.length) return v;
+  const toDigit: Record<string, string> = { O: "0", I: "1", L: "1", S: "5", B: "8" };
+  const toLetter: Record<string, string> = { "0": "O", "1": "I", "5": "S", "8": "B" };
+  return v.split("").map((ch, i) => {
+    const t = p[i];
+    if ((t === "9" || t === "0") && toDigit[ch]) return toDigit[ch];
+    if (t === "A" && toLetter[ch]) return toLetter[ch];
+    if (t === "Z" && ch === "2") return "Z";
+    return ch;
+  }).join("");
+}

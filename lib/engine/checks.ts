@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import {
   EXPECTED_PAN_TYPE, GST_STATE_CODES, PAN_HOLDER_TYPES, clean, gstinChecksumOk, gstinPan, gstinState, gstinStructure,
-  hashAccount, isEin, isEmail, isIfsc, isPan, isPhone, isPincode, isRoutingNumber, isUsZip, last4, mask,
+  fixFixedPositions, hashAccount, isEin, isEmail, isIfsc, isPan, isPhone, isPincode, isRoutingNumber, isUsZip, last4, mask,
 } from "./ids";
 import { compareByRules, fallbackJudge, nameSimilarity, normaliseName, pairKey } from "./names";
 
@@ -58,7 +58,11 @@ function trusted(ctx: CheckContext, slot: DocSlot, field: keyof ExtractedFields)
   const v = d.fields[field];
   const conf = d.confidence[field] ?? d.overall_confidence;
   if (!v || conf < ctx.confidenceThreshold) return null;
-  return { value: v, src: { label: `${DOC_LABEL[slot]} (AI-read, ${conf.toFixed(2)})`, value: v } };
+  // Fixed-format IDs: correct O/0-style misreads at positions whose type the format dictates, and say so.
+  const kind = field === "pan" ? "pan" : field === "ifsc" ? "ifsc" : field === "gstin" ? "gstin" : null;
+  const fixed = kind ? fixFixedPositions(v, kind) : v;
+  const note = kind && fixed !== clean(v) ? ` (read as ${v}; corrected O/0-style misread using the ${kind.toUpperCase()} format)` : "";
+  return { value: fixed, src: { label: `${DOC_LABEL[slot]} (AI-read, ${conf.toFixed(2)})`, value: fixed + note } };
 }
 
 /** Name judgement: rules first, then the AI result supplied by the workflow, then the offline fallback. */
