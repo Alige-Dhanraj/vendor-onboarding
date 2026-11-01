@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "typeRoots": ["/opt/npm-tools/node_modules/@types"]
+  },
+  "include": ["lib/engine/**/*.ts", "lib/ai/**/*.ts", "lib/store/types.ts", "lib/store/memory.ts", "lib/workflow/**/*.ts", "lib/scenarios.ts", "lib/seed.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+}
