@@ -210,8 +210,10 @@ function Documents({ documents, running }: { documents: any[]; running: boolean 
                 {d.url && d.mime_type?.startsWith("image/") ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={d.url} alt={d.file_name} className="h-32 w-full object-cover object-top" />
+                ) : d.url && d.mime_type === "application/pdf" ? (
+                  <iframe src={`${d.url}#toolbar=0&navpanes=0&view=FitH`} title={d.file_name} className="pointer-events-none h-32 w-full bg-white" />
                 ) : (
-                  <div className="grid h-32 place-items-center text-xs text-slate-500">{d.url ? "Open PDF" : running ? "…" : "Preview unavailable"}</div>
+                  <div className="grid h-32 place-items-center text-xs text-slate-500">{running ? "…" : "Preview unavailable"}</div>
                 )}
               </a>
               <div className="min-w-0 text-sm">

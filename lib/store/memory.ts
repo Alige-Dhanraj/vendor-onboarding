@@ -86,6 +86,10 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
     async getBlocklist() { return seed.blocklist; },
     async getRegistry() { return seed.registry; },
 
+    async resetDemo({ vendors: seedVendors }) {
+      subs.length = 0; docs.length = 0; runs.length = 0; events.length = 0; checks.length = 0; messages.length = 0; actions.length = 0;
+      vendors.length = 0; vendors.push(...seedVendors.map((v) => ({ ...v }))); runNo = 0;
+    },
     async cacheGet<T>(key: string) { return (cache.get(key) as T) ?? null; },
     async cacheSet(key, value) { cache.set(key, value); },
   };

@@ -70,6 +70,9 @@ export interface Store {
   getBlocklist(): Promise<BlocklistEntry[]>;
   getRegistry(): Promise<TestRegistry>;
 
+  // demo
+  resetDemo(seed: { vendors: VendorRecord[] }): Promise<void>;
+
   // AI cache
   cacheGet<T>(key: string): Promise<T | null>;
   cacheSet(key: string, value: unknown, model: string): Promise<void>;

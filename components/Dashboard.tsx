@@ -58,7 +58,14 @@ export default function Dashboard({ initialFilter = "all", title }: { initialFil
             <Pill tone={mode.store === "supabase" ? "slate" : "amber"}>{mode.store === "supabase" ? "Data: Supabase" : "Data: in-memory (local only)"}</Pill>
           </div>
         </div>
+        <div className="flex gap-2">
+        <button onClick={async () => {
+          if (!window.confirm("Reset demo data? This deletes every run and restores the 3 sample vendors.")) return;
+          const res = await fetch("/api/demo/reset", { method: "POST" });
+          if (res.ok) { const r = await fetch("/api/runs", { cache: "no-store" }); setData(await r.json()); } else alert((await res.json()).error);
+        }} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Reset demo data</button>
         <Link href="/" className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">New submission</Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">

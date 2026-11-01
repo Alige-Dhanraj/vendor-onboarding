@@ -117,6 +117,12 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       return Object.fromEntries(rows.map((r) => [r.gstin, { status: r.status, legal_name: r.legal_name }])) as TestRegistry;
     },
 
+    async resetDemo({ vendors }) {
+      // Deletes all submissions (runs, events, checks, messages, reviewer actions cascade) and restores the seed vendors.
+      must(await db.from("submissions").delete().not("id", "is", null), "clear submissions");
+      must(await db.from("vendor_master").delete().not("id", "is", null), "clear vendor master");
+      must(await db.from("vendor_master").insert(vendors), "restore vendors");
+    },
     async cacheGet<T>(key: string) {
       const row = must(await db.from("ai_cache").select("value").eq("key", key).maybeSingle(), "read cache") as { value: T } | null;
       return row?.value ?? null;
