@@ -27,6 +27,7 @@ function requiredSlots(f: SubmissionForm): DocSlot[] {
 
 async function sampleFile(name: string): Promise<File> {
   const res = await fetch(`/samples/${name}`);
+  if (!res.ok) throw new Error(`${name} (${res.status})`);
   const blob = await res.blob();
   return new File([blob], name, { type: name.endsWith(".pdf") ? "application/pdf" : "image/png" });
 }
@@ -40,6 +41,7 @@ export default function SubmitForm() {
   const [vendorRef, setVendorRef] = useState<string>("");
   const [version, setVersion] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const scenario = useMemo(() => SCENARIOS.find((s) => s.id === scenarioId), [scenarioId]);
@@ -53,9 +55,17 @@ export default function SubmitForm() {
     if (!s) { setForm(EMPTY); setFiles({}); return; }
     const src = v === 2 && s.resubmission ? s.resubmission : s;
     setForm(structuredClone(src.form));
-    const loaded: Partial<Record<DocSlot, File>> = {};
-    await Promise.all(src.docs.map(async (d) => { loaded[d.slot] = await sampleFile(d.file_name); }));
-    setFiles(loaded);
+    setFiles({});
+    setLoadingDocs(true);
+    try {
+      const loaded: Partial<Record<DocSlot, File>> = {};
+      await Promise.all(src.docs.map(async (d) => { loaded[d.slot] = await sampleFile(d.file_name); }));
+      setFiles(loaded);
+    } catch (err) {
+      setError(`Could not attach the sample documents: ${(err as Error).message}`);
+    } finally {
+      setLoadingDocs(false);
+    }
   }
 
   // Resubmission links arrive as /?scenario=...&v=2&vendor_ref=...
@@ -212,7 +222,7 @@ export default function SubmitForm() {
             <p className="text-xs text-slate-400">PDF, PNG or JPG, up to 10 MB each. Files are stored privately.</p>
           </div>
           <div className="mt-6 border-t border-slate-100 pt-5">
-            <button type="submit" className={`${btnPrimary} w-full`} disabled={busy}>{busy ? "Submitting…" : "Submit and run checks"}</button>
+            <button type="submit" className={`${btnPrimary} w-full`} disabled={busy || loadingDocs}>{loadingDocs ? "Attaching sample documents…" : busy ? "Submitting…" : "Submit and run checks"}</button>
             {error && <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             <p className="mt-3 text-xs text-slate-500">The form is not validated in the browser on purpose: every check runs in the process, so you can watch it catch problems.</p>
           </div>
