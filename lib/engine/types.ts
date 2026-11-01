@@ -22,7 +22,7 @@ export interface SubmissionForm {
   entity_type: EntityType | "";
   country: Country | "";
   address: { street: string; city: string; state: string; postal_code: string };
-  contact: { name: string; email: string; phone: string };
+  contact: { name: string; email: string; phone: string; alt_phone?: string };
   tax: { pan?: string; gst_registered?: boolean; gstin?: string; ein?: string };
   bank: { account_holder: string; account_number: string; ifsc?: string; routing_number?: string };
   msme_udyam?: string;

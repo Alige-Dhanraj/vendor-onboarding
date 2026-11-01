@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SCENARIOS } from "@/lib/scenarios";
+import { GST_STATE_CODES } from "@/lib/engine/ids";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
 import { SLOT_LABEL } from "@/lib/ui-labels";
 import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } from "./ui";
@@ -10,7 +11,7 @@ import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } f
 const EMPTY: SubmissionForm = {
   vendor_ref: "", legal_name: "", trade_name: "", entity_type: "", country: "IN",
   address: { street: "", city: "", state: "", postal_code: "" },
-  contact: { name: "", email: "", phone: "" },
+  contact: { name: "", email: "", phone: "", alt_phone: "" },
   tax: { pan: "", gst_registered: true, gstin: "", ein: "" },
   bank: { account_holder: "", account_number: "", ifsc: "", routing_number: "" },
 };
@@ -166,6 +167,20 @@ export default function SubmitForm() {
   }
 
   const isUS = form.country === "US";
+  const stateOptions = useMemo(() => {
+    const list = Object.values(GST_STATE_CODES).filter((n) => n !== "Other Territory").sort();
+    const cur = form.address.state;
+    return cur && !list.includes(cur) ? [cur, ...list] : list;
+  }, [form.address.state]);
+  const need: [string, string | undefined][] = [
+    ["legal name", form.legal_name], ["entity type", form.entity_type], ["state", form.address.state], ["street", form.address.street],
+    ["city", form.address.city], [isUS ? "ZIP code" : "pincode", form.address.postal_code], ["contact name", form.contact.name],
+    ["contact email", form.contact.email], ["phone", form.contact.phone], ["account holder", form.bank.account_holder], ["account number", form.bank.account_number],
+    ...(isUS
+      ? ([["EIN", form.tax.ein], ["routing number", form.bank.routing_number]] as [string, string | undefined][])
+      : ([["PAN", form.tax.pan], ["IFSC", form.bank.ifsc], ...(form.tax.gst_registered === false ? [] : [["GSTIN", form.tax.gstin]])] as [string, string | undefined][])),
+  ];
+  const missing = need.filter(([, v]) => !v || !String(v).trim()).map(([k]) => k);
   const hl = (path: string) => (aiFilled.has(path) ? " ring-2 ring-indigo-200 bg-indigo-50/40" : "");
   const inp = (path: string, extra = "") => `${inputCls}${hl(path)} ${extra}`;
 
@@ -213,8 +228,8 @@ export default function SubmitForm() {
         <Card className="p-5">
           <SectionTitle hint="Highlighted fields came from the documents">2 · Check the details</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Legal name"><input className={inp("legal_name")} value={form.legal_name} onChange={(e) => set("legal_name", e.target.value)} /></Field>
-            <Field label="Entity type">
+            <Field label="Legal name" required><input className={inp("legal_name")} value={form.legal_name} onChange={(e) => set("legal_name", e.target.value)} /></Field>
+            <Field label="Entity type" required>
               <select className={inputCls} value={form.entity_type} onChange={(e) => set("entity_type", e.target.value)}>
                 <option value="">Select…</option>
                 <option value="PRIVATE_LIMITED">Private Limited</option><option value="LLP">LLP</option>
@@ -223,28 +238,36 @@ export default function SubmitForm() {
               </select>
             </Field>
             {isUS ? (
-              <Field label="EIN"><input className={inp("tax.ein", "mono")} value={form.tax.ein ?? ""} onChange={(e) => set("tax.ein", e.target.value)} /></Field>
+              <Field label="EIN" required><input className={inp("tax.ein", "mono")} value={form.tax.ein ?? ""} onChange={(e) => set("tax.ein", e.target.value)} /></Field>
             ) : (<>
-              <Field label="PAN"><input className={inp("tax.pan", "mono")} value={form.tax.pan ?? ""} onChange={(e) => set("tax.pan", e.target.value.toUpperCase())} /></Field>
-              <Field label="GSTIN"><input className={inp("tax.gstin", "mono")} value={form.tax.gstin ?? ""} onChange={(e) => set("tax.gstin", e.target.value.toUpperCase())} disabled={form.tax.gst_registered === false} placeholder={form.tax.gst_registered === false ? "Not GST-registered" : ""} /></Field>
+              <Field label="PAN" required><input className={inp("tax.pan", "mono")} value={form.tax.pan ?? ""} onChange={(e) => set("tax.pan", e.target.value.toUpperCase())} /></Field>
+              <Field label="GSTIN" required={form.tax.gst_registered !== false}><input className={inp("tax.gstin", "mono")} value={form.tax.gstin ?? ""} onChange={(e) => set("tax.gstin", e.target.value.toUpperCase())} disabled={form.tax.gst_registered === false} placeholder={form.tax.gst_registered === false ? "Not GST-registered" : ""} /></Field>
             </>)}
-            <Field label="Bank account holder"><input className={inp("bank.account_holder")} value={form.bank.account_holder} onChange={(e) => set("bank.account_holder", e.target.value)} /></Field>
-            <Field label="Account number"><input className={inp("bank.account_number", "mono")} value={form.bank.account_number} onChange={(e) => set("bank.account_number", e.target.value)} /></Field>
+            <Field label="Bank account holder" required><input className={inp("bank.account_holder")} value={form.bank.account_holder} onChange={(e) => set("bank.account_holder", e.target.value)} /></Field>
+            <Field label="Account number" required><input className={inp("bank.account_number", "mono")} value={form.bank.account_number} onChange={(e) => set("bank.account_number", e.target.value)} /></Field>
             {isUS
-              ? <Field label="Routing number"><input className={inp("bank.routing_number", "mono")} value={form.bank.routing_number ?? ""} onChange={(e) => set("bank.routing_number", e.target.value)} /></Field>
-              : <Field label="IFSC"><input className={inp("bank.ifsc", "mono")} value={form.bank.ifsc ?? ""} onChange={(e) => set("bank.ifsc", e.target.value.toUpperCase())} /></Field>}
-            <Field label="State"><input className={inp("address.state")} value={form.address.state} onChange={(e) => set("address.state", e.target.value)} /></Field>
+              ? <Field label="Routing number" required><input className={inp("bank.routing_number", "mono")} value={form.bank.routing_number ?? ""} onChange={(e) => set("bank.routing_number", e.target.value)} /></Field>
+              : <Field label="IFSC" required><input className={inp("bank.ifsc", "mono")} value={form.bank.ifsc ?? ""} onChange={(e) => set("bank.ifsc", e.target.value.toUpperCase())} /></Field>}
+            <Field label="State" required>
+              {isUS
+                ? <input className={inp("address.state")} value={form.address.state} onChange={(e) => set("address.state", e.target.value)} />
+                : <select className={inp("address.state")} value={form.address.state} onChange={(e) => set("address.state", e.target.value)}>
+                    <option value="">Select state…</option>
+                    {stateOptions.map((st) => <option key={st} value={st}>{st}</option>)}
+                  </select>}
+            </Field>
           </div>
           <details className="mt-5 group" open={!!form.contact.email || !scenarioId}>
             <summary className="cursor-pointer text-sm font-medium text-slate-700">Address and contact</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="Street"><input className={inputCls} value={form.address.street} onChange={(e) => set("address.street", e.target.value)} /></Field></div>
-              <Field label="City"><input className={inputCls} value={form.address.city} onChange={(e) => set("address.city", e.target.value)} /></Field>
-              <Field label={isUS ? "ZIP code" : "Pincode"}><input className={inputCls} value={form.address.postal_code} onChange={(e) => set("address.postal_code", e.target.value)} /></Field>
-              <Field label="Contact name"><input className={inputCls} value={form.contact.name} onChange={(e) => set("contact.name", e.target.value)} /></Field>
-              <Field label="Contact email"><input className={inputCls} value={form.contact.email} onChange={(e) => set("contact.email", e.target.value)} /></Field>
-              <Field label="Phone"><input className={inputCls} value={form.contact.phone} onChange={(e) => set("contact.phone", e.target.value)} /></Field>
-              <Field label="Country">
+              <div className="sm:col-span-2"><Field label="Street" required><input className={inputCls} value={form.address.street} onChange={(e) => set("address.street", e.target.value)} /></Field></div>
+              <Field label="City" required><input className={inputCls} value={form.address.city} onChange={(e) => set("address.city", e.target.value)} /></Field>
+              <Field label={isUS ? "ZIP code" : "Pincode"} required><input className={inputCls} value={form.address.postal_code} onChange={(e) => set("address.postal_code", e.target.value)} /></Field>
+              <Field label="Contact name" required><input className={inputCls} value={form.contact.name} onChange={(e) => set("contact.name", e.target.value)} /></Field>
+              <Field label="Contact email" required><input className={inputCls} value={form.contact.email} onChange={(e) => set("contact.email", e.target.value)} /></Field>
+              <Field label="Phone" required><input className={inputCls} value={form.contact.phone} onChange={(e) => set("contact.phone", e.target.value)} /></Field>
+              <Field label="Alternate mobile (optional)"><input className={inputCls} value={form.contact.alt_phone ?? ""} onChange={(e) => set("contact.alt_phone", e.target.value)} /></Field>
+              <Field label="Country" required>
                 <select className={inputCls} value={form.country} onChange={(e) => set("country", e.target.value)}><option value="IN">India</option><option value="US">United States</option></select>
               </Field>
               {!isUS && <Field label="GST registered?">
@@ -259,10 +282,11 @@ export default function SubmitForm() {
       <div className="space-y-6">
         <Card className="p-5 lg:sticky lg:top-20">
           <SectionTitle>3 · Run the checks</SectionTitle>
-          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || docs.length === 0}>
+          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || docs.length === 0 || missing.length > 0}>
             {reading ? "Reading documents…" : busy ? "Submitting…" : "Submit and run checks"}
           </button>
           {docs.length === 0 && !reading && <p className="mt-2 text-xs text-slate-500">Add the documents first.</p>}
+          {docs.length > 0 && !reading && missing.length > 0 && <p className="mt-2 text-xs text-slate-500">Still needed (*): {missing.join(", ")}.</p>}
           {error && <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
           <p className="mt-3 text-xs text-slate-500">21 checks run on the server: nothing missing, IDs valid, everything consistent, no fraud signals.</p>
 

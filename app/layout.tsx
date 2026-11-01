@@ -33,9 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
-        <footer className="mx-auto max-w-7xl px-6 pb-10 text-xs text-slate-400">
-          Case-study build. All vendor data and documents are synthetic. GST status comes from a labelled TEST REGISTRY, not the live GST portal. Bank ownership is not verified with a bank.
-        </footer>
       </body>
     </html>
   );

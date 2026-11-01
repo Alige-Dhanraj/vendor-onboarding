@@ -219,6 +219,7 @@ function v6(ctx: CheckContext): CheckResult {
   if (pc && !(f.country === "US" ? isUsZip(pc) : isPincode(pc))) issues.push(`${f.country === "US" ? "ZIP code" : "pincode"} "${pc}"`);
   if (f.contact.email && !isEmail(f.contact.email)) issues.push(`email "${f.contact.email}"`);
   if (f.contact.phone && !isPhone(f.contact.phone, f.country)) issues.push(`phone "${f.contact.phone}"`);
+  if (f.contact.alt_phone && !isPhone(f.contact.alt_phone, f.country)) issues.push(`alternate mobile "${f.contact.alt_phone}"`);
   const sources = [formSrc(`${pc} · ${f.contact.email} · ${f.contact.phone}`)];
   if (!issues.length) return result(b, "PASS", null, { sources, reason: "Contact details are well-formed." });
   return result(b, "FAIL", "FIXABLE", { sources, reason: `Not valid: ${issues.join(", ")}.`, next_action: "Ask the vendor to correct them.", vendor_fix: `Please correct your ${issues.join(", ")}.` });

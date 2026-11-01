@@ -39,6 +39,19 @@ export default function RunView({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Result popup: only when this page watched the run finish (not when reopening an old run).
+  const [toast, setToast] = useState<string | null>(null);
+  const sawRunning = useRef(false);
+  useEffect(() => {
+    if (!data) return;
+    if (data.run.status === "RUNNING") { sawRunning.current = true; return; }
+    if (!sawRunning.current) return;
+    sawRunning.current = false;
+    setToast(effectiveStatus(data.run));
+    const t = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(t);
+  }, [data]);
+
   if (error) return <Card className="p-6 text-sm text-rose-700">{error}</Card>;
   if (!data) return <div className="text-sm text-slate-500">Loading run…</div>;
 
@@ -50,6 +63,7 @@ export default function RunView({ id }: { id: string }) {
 
   return (
     <div className="space-y-6">
+      {toast && <ResultToast status={toast} />}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Run VEN-{String(run.run_number).padStart(4, "0")} · version {submission.version}</div>
@@ -314,5 +328,28 @@ function ReviewPanel({ run, actions, onDone }: { run: any; actions: any[]; onDon
         </>
       )}
     </Card>
+  );
+}
+
+const TOAST: Record<string, { label: string; color: string; icon: string }> = {
+  APPROVED: { label: "Vendor approved", color: "text-emerald-600", icon: "M6 12.5l4 4 8-9" },
+  PENDING_INFO: { label: "Waiting on the vendor", color: "text-amber-500", icon: "M12 7v6m0 3.5v.01" },
+  MANUAL_REVIEW: { label: "Needs a reviewer", color: "text-orange-500", icon: "M12 7v6m0 3.5v.01" },
+  REJECTED: { label: "Rejected", color: "text-rose-600", icon: "M8 8l8 8m0-8l-8 8" },
+  FAILED: { label: "Run failed", color: "text-rose-600", icon: "M8 8l8 8m0-8l-8 8" },
+};
+
+function ResultToast({ status }: { status: string }) {
+  const t = TOAST[status] ?? TOAST.FAILED;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center">
+      <div className="toast-card flex flex-col items-center gap-3 rounded-2xl border border-slate-200 bg-white px-10 py-8 shadow-xl">
+        <svg viewBox="0 0 24 24" className={`h-16 w-16 ${t.color}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+          <path d={t.icon} className="tick-draw" />
+        </svg>
+        <div className="text-lg font-semibold text-slate-900">{t.label}</div>
+      </div>
+    </div>
   );
 }
