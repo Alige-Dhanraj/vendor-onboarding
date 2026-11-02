@@ -6,7 +6,8 @@ import { SCENARIOS } from "@/lib/scenarios";
 import { GST_STATE_CODES } from "@/lib/engine/ids";
 import { parseSignature } from "@/lib/engine/signature";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
-import { SLOT_LABEL } from "@/lib/ui-labels";
+import { requestDocumentsMessage } from "@/lib/engine/message";
+import { SLOT_LABEL, mailtoLink } from "@/lib/ui-labels";
 import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } from "./ui";
 
 const EMPTY: SubmissionForm = {
@@ -70,6 +71,9 @@ export default function SubmitForm() {
   const [dragOver, setDragOver] = useState(false);
   const [signature, setSignature] = useState("");
   const [sigNote, setSigNote] = useState<string | null>(null);
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqName, setReqName] = useState("");
+  const [reqEmail, setReqEmail] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   const scenario = useMemo(() => SCENARIOS.find((s) => s.id === scenarioId), [scenarioId]);
@@ -254,6 +258,16 @@ export default function SubmitForm() {
               <li key={s} className="flex items-center gap-3 px-3 py-2.5 text-slate-400"><span>○</span><span className="flex-1">{SLOT_LABEL[s]}</span><span className="text-xs">still needed</span></li>
             ))}
           </ul>
+          <div className="mt-3 text-sm">
+            <button type="button" className="text-indigo-700 hover:underline" onClick={() => setReqOpen((v) => !v)}>Don't have the files yet? Ask the vendor for them</button>
+            {reqOpen && (
+              <div className="mt-3 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} /></Field>
+                <Field label="Vendor email"><input className={inputCls} type="email" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
+                <a className={`${btnPrimary} ${reqEmail.includes("@") ? "" : "pointer-events-none opacity-50"}`} href={mailtoLink(reqEmail, requestDocumentsMessage(reqName, required.map((s) => SLOT_LABEL[s])))}>Open email</a>
+              </div>
+            )}
+          </div>
           {aiFilled.size > 0 && <p className="mt-3 text-sm text-indigo-700">Filled {aiFilled.size} field{aiFilled.size > 1 ? "s" : ""} from the documents (highlighted below). Please check them.</p>}
         </Card>
 

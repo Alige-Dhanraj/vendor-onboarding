@@ -197,3 +197,30 @@ test("vendor messages are short numbered lists with bold document names", () => 
   assert.match(message.body, /2\. \*\*Cancelled cheque \/ bank letter\*\*: wrong file/);
   assert.ok(message.body.length < 400, "short");
 });
+
+test("vendor record export: last 4 digits only, safe CSV", async () => {
+  const { buildRecord, recordCsv } = await import("../lib/workflow/record");
+  const base = SCENARIOS[0].form;
+  const form = { ...base, legal_name: 'Acme, "Best" Pvt Ltd', contact: { ...base.contact, name: "=SUM(A1)" } };
+  const b: any = {
+    run: { id: "r1", status: "COMPLETED", internal_status: "APPROVED", final_status: null, started_at: "2026-11-02T00:00:00Z", finished_at: "2026-11-02T00:00:09Z" },
+    submission: { vendor_ref: "acme", version: 1, form_data: form }, reviewer_actions: [],
+  };
+  const rec = buildRecord(b);
+  assert.equal(rec.bank_account_last4, base.bank.account_number.slice(-4));
+  assert.equal(rec.verified_by, "VendorGate automatic checks");
+  const csv = recordCsv(rec);
+  assert.ok(!csv.includes(base.bank.account_number), "full account number must not be exported");
+  assert.match(csv, /"Acme, ""Best"" Pvt Ltd"/);
+  assert.match(csv, /'=SUM\(A1\)/, "formula is defused");
+  assert.ok(!csv.includes("'+91"), "phone numbers are left alone");
+});
+
+test("request and reminder emails are short", async () => {
+  const m = await import("../lib/engine/message");
+  const r = m.requestDocumentsMessage("Priya Raman", ["GST certificate", "PAN card"]);
+  assert.match(r.body, /Hi Priya,/);
+  assert.match(r.body, /1\. \*\*GST certificate\*\*/);
+  assert.ok(m.reminderMessage("").body.startsWith("Hi there,"));
+  assert.ok(m.reminderMessage("Priya").body.length < 200);
+});

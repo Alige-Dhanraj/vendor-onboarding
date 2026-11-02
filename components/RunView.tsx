@@ -135,6 +135,7 @@ export default function RunView({ id }: { id: string }) {
         </section>
       )}
 
+      {!running && status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
       {message && <MessageCard message={message} email={email} />}
 
       {documents.length > 0 && (
@@ -366,5 +367,39 @@ function ResultToast({ status }: { status: string }) {
         <div className="text-lg font-semibold text-slate-900">{t.label}</div>
       </div>
     </div>
+  );
+}
+
+function RecordCard({ id, form, actions }: { id: string; form: any; actions: any[] }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const by = actions.find((a: any) => a.action === "APPROVE")?.reviewer ?? "VendorGate automatic checks";
+  const us = form.country === "US";
+  const rows: [string, string][] = [
+    ["Legal name", form.legal_name], ["Type", String(form.entity_type).replace("_", " ").toLowerCase()],
+    ...(us ? ([["EIN", form.tax.ein]] as [string, string][]) : ([["PAN", form.tax.pan], ["GSTIN", form.tax.gstin || "Not GST-registered"]] as [string, string][])),
+    ["Bank account holder", form.bank.account_holder], ["Account", form.bank.account_number], [us ? "Routing number" : "IFSC", (us ? form.bank.routing_number : form.bank.ifsc) ?? ""],
+    ["Address", [form.address.street, form.address.city, form.address.state, form.address.postal_code].filter(Boolean).join(", ")],
+    ["Contact", [form.contact.name, form.contact.email, form.contact.phone].filter(Boolean).join(" · ")],
+  ];
+  async function send() {
+    setBusy(true); setNote(null);
+    const res = await fetch(`/api/runs/${id}/export`, { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    setNote(res.ok ? { ok: true, text: `Sent to ${json.host}.` } : { ok: false, text: json.error ?? "Could not send." });
+  }
+  return (
+    <Card className="p-5">
+      <SectionTitle hint={`Verified by ${by}`}>Vendor record</SectionTitle>
+      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[150px_1fr]">
+        {rows.map(([k, v]) => (<div key={k} className="contents"><dt className="text-slate-500">{k}</dt><dd className="text-slate-900">{v}</dd></div>))}
+      </dl>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <a className={btnSecondary} href={`/api/runs/${id}/record?format=csv`}>Download CSV</a>
+        <button className={btnSecondary} onClick={send} disabled={busy}>{busy ? "Sending…" : "Send to accounting system"}</button>
+        {note && <span className={`text-sm ${note.ok ? "text-emerald-700" : "text-rose-700"}`}>{note.text}</span>}
+      </div>
+    </Card>
   );
 }

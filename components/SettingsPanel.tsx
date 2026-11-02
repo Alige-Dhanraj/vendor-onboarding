@@ -5,7 +5,7 @@ import { fmtMs } from "@/lib/ui-labels";
 import { useRuns } from "./useRuns";
 import { Card, SectionTitle, btnSecondary, inputCls } from "./ui";
 
-export default function SettingsPanel({ users }: { users: { name: string; email: string; role: string }[] }) {
+export default function SettingsPanel({ users, accountingHost }: { users: { name: string; email: string; role: string }[]; accountingHost: string | null }) {
   const data = useRuns(10000);
   const [manual, setManual] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -43,6 +43,13 @@ export default function SettingsPanel({ users }: { users: { name: string; email:
           {users.map((u) => <li key={u.email} className="flex items-center justify-between py-2"><span><b>{u.name}</b> <span className="text-slate-500">{u.email}</span></span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs">{u.role[0] + u.role.slice(1).toLowerCase()}</span></li>)}
         </ul>
         <p className="mt-3 text-xs text-slate-500">Adding and removing people comes next.</p>
+      </Card>
+
+      <Card className="p-5">
+        <SectionTitle>Accounting system</SectionTitle>
+        <p className="text-sm text-slate-700">
+          {accountingHost ? <>Approved vendors can be sent to <b>{accountingHost}</b> from their result page.</> : "Not connected. Add ACCOUNTING_WEBHOOK_URL in Vercel to send approved vendors to your accounting software."}
+        </p>
       </Card>
 
       <Card className="p-5">

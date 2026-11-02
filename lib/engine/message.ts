@@ -51,3 +51,19 @@ export function templateMessage(form: SubmissionForm, decision: Decision, result
     analyst_summary: `Pending vendor action on ${checks}.`,
   };
 }
+
+/** Short email asking a vendor for the documents we need. */
+export function requestDocumentsMessage(contactName: string, docLabels: string[]) {
+  return {
+    subject: "Documents needed for your registration",
+    body: `Hi ${firstName(contactName)},\n\nTo register you as a vendor, please reply with:\n\n${numbered(docLabels.map((l) => `**${l}**`))}\n\nThank you!`,
+  };
+}
+
+/** Short nudge for a vendor we are still waiting on. */
+export function reminderMessage(contactName: string) {
+  return {
+    subject: "Reminder: your registration",
+    body: `Hi ${firstName(contactName)},\n\nA quick reminder: we're still waiting on the items in our earlier email.\n\nJust reply to this email. Thank you!`,
+  };
+}

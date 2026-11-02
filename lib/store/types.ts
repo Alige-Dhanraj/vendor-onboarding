@@ -39,7 +39,7 @@ export interface RunBundle {
 }
 
 export interface RunListItem extends RunRow {
-  vendor_ref: string; legal_name: string; version: number; scenario_id: string | null; gstin: string | null;
+  vendor_ref: string; legal_name: string; version: number; scenario_id: string | null; gstin: string | null; contact_name: string; contact_email: string;
 }
 
 export interface Store {

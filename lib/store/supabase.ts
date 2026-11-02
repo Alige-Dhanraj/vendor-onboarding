@@ -96,7 +96,7 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     async listRuns(limit = 200) {
       const rows = must(await db.from("runs").select("*, submissions(vendor_ref, version, scenario_id, form_data)").order("started_at", { ascending: false }).limit(limit), "list runs") as any[];
       return rows.map(({ submissions: s, ...r }) => ({
-        ...r, vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null,
+        ...r, vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null, contact_name: s?.form_data?.contact?.name ?? "", contact_email: s?.form_data?.contact?.email ?? "",
       })) as RunListItem[];
     },
     async addReviewerAction(a) {

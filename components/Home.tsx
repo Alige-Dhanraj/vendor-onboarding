@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { effectiveStatus, waiting } from "@/lib/ui-labels";
+import { reminderMessage } from "@/lib/engine/message";
+import { effectiveStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { StatusBadge } from "./ui";
 
@@ -14,6 +15,8 @@ function Tile({ href, label, count, cls }: { href: string; label: string; count:
   );
 }
 
+const rowBtn = "hidden rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex";
+
 export default function Home({ firstName }: { firstName: string }) {
   const data = useRuns();
   const [hello, setHello] = useState("Hello");
@@ -24,7 +27,7 @@ export default function Home({ firstName }: { firstName: string }) {
   const waits = latest?.filter((r: any) => effectiveStatus(r) === "PENDING_INFO") ?? [];
   const weekAgo = Date.now() - 7 * 864e5;
   const approved = latest?.filter((r: any) => effectiveStatus(r) === "APPROVED" && new Date(r.started_at).getTime() >= weekAgo) ?? [];
-  const todo = [...review.map((r: any) => ({ r, action: "Review" })), ...waits.map((r: any) => ({ r, action: "Open" }))]
+  const todo = [...review.map((r: any) => ({ r, kind: "review" })), ...waits.map((r: any) => ({ r, kind: "wait" }))]
     .sort((a, b) => new Date(b.r.started_at).getTime() - new Date(a.r.started_at).getTime());
 
   return (
@@ -47,19 +50,24 @@ export default function Home({ firstName }: { firstName: string }) {
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {todo.map(({ r, action }) => (
-              <li key={r.id}>
-                <Link href={`/runs/${r.id}`} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-slate-900">{r.legal_name || "Unnamed vendor"}</div>
-                    <div className="truncate text-sm text-slate-500">{r.headline}</div>
-                  </div>
-                  <div className="hidden text-xs text-slate-400 sm:block">{waiting(r.started_at)}</div>
-                  <StatusBadge status={effectiveStatus(r)} />
-                  <span className="hidden rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 sm:inline-flex">{action}</span>
-                </Link>
-              </li>
-            ))}
+            {todo.map(({ r, kind }) => {
+              const stale = Date.now() - new Date(r.started_at).getTime() >= 3 * 864e5;
+              return (
+                <li key={r.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                  <Link href={`/runs/${r.id}`} className="flex min-w-0 flex-1 items-center gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-medium text-slate-900">{r.legal_name || "Unnamed vendor"}</div>
+                      <div className="truncate text-sm text-slate-500">{r.headline}</div>
+                    </div>
+                    <div className={`hidden text-xs sm:block ${stale ? "font-medium text-amber-700" : "text-slate-400"}`}>{waiting(r.started_at)}</div>
+                    <StatusBadge status={effectiveStatus(r)} />
+                  </Link>
+                  {kind === "review"
+                    ? <Link href={`/runs/${r.id}`} className={rowBtn}>Review</Link>
+                    : <a href={mailtoLink(r.contact_email, reminderMessage(r.contact_name))} className={rowBtn}>Send reminder</a>}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
