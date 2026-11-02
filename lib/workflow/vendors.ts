@@ -16,8 +16,8 @@ export async function changeVendorStatus(store: Store, args: { runId: string; ac
   if (args.action === "REACTIVATE") {
     if (b.vendor.active) throw new VendorError("This vendor is already active.");
     if (/^Fraud concern/.test(b.vendor.reason ?? "")) throw new VendorError("A vendor deactivated for a fraud concern can't be reactivated here.");
-    await store.setVendorActive(args.runId, true, { reason: "", by: args.by });
     await store.addReviewerAction({ run_id: args.runId, action: "REACTIVATE", reason: `Reactivated${args.note?.trim() ? `: ${args.note.trim()}` : ""}`, reviewer: args.by });
+    await store.setVendorActive(args.runId, true, { reason: "", by: args.by });
     return;
   }
 
@@ -26,8 +26,8 @@ export async function changeVendorStatus(store: Store, args: { runId: string; ac
   if (!label) throw new VendorError("Choose a reason.");
   const text = args.note?.trim() ? `${label}: ${args.note.trim()}` : label;
   if (text.length < 10) throw new VendorError("Please add a short note (at least 10 characters).");
-  await store.setVendorActive(args.runId, false, { reason: text, by: args.by });
   await store.addReviewerAction({ run_id: args.runId, action: "DEACTIVATE", reason: text, reviewer: args.by });
+  await store.setVendorActive(args.runId, false, { reason: text, by: args.by });
   if (label === "Fraud concern") {
     await store.addBlocklist({
       name: form.legal_name, pan: form.tax.pan?.toUpperCase(),

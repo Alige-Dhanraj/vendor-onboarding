@@ -109,6 +109,7 @@ export default function RunView({ id }: { id: string }) {
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
               {status === "PENDING_INFO" && <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link>}
               {status === "APPROVED" && !inactive && <Link className={btnSecondary} href="/new">Next vendor</Link>}
+              {inactive && canDecide && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
             </div>
             <div className="mt-3 text-xs text-slate-500">
               Checked in {fmtMs(run.duration_ms)} · <button className="underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
@@ -137,7 +138,7 @@ export default function RunView({ id }: { id: string }) {
       )}
 
       {!running && status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
-      {vendor && status === "APPROVED" && <VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} />}
+      {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
       {message && <MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} />}
 
       {documents.length > 0 && (
@@ -440,7 +441,8 @@ function VendorLifecycle({ id, vendor, canDecide, onDone }: { id: string; vendor
         <>
           <p className="text-sm text-slate-700"><b>Inactive</b>{vendor.at ? ` since ${new Date(vendor.at).toLocaleDateString()}` : ""}{vendor.by ? ` · ${vendor.by}` : ""}</p>
           {vendor.reason && <p className="mt-1 text-sm text-slate-600">{vendor.reason}</p>}
-          {canDecide && !fraud && <button className={`${btnSecondary} mt-3`} disabled={busy} onClick={() => go("REACTIVATE")}>Reactivate vendor</button>}
+          {canDecide && !fraud && <button className={`${btnPrimary} mt-3`} disabled={busy} onClick={() => go("REACTIVATE")}>{busy ? "Saving…" : "Reactivate vendor"}</button>}
+          {!canDecide && <p className="mt-2 text-xs text-slate-500">Only a reviewer or admin can reactivate this vendor. You are signed in as a buyer.</p>}
           {fraud && <p className="mt-2 text-xs text-slate-500">Deactivated for a fraud concern, so it can't be reactivated here.</p>}
         </>
       ) : !open ? (
