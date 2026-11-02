@@ -1,11 +1,14 @@
-// POST /api/demo/reset: clears all runs and restores the seed vendor master (demo convenience).
+// POST /api/demo/reset: clears all runs and restores the seed vendor master. Admin only.
 import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
+import { guard } from "@/lib/auth/server";
 import { VENDOR_MASTER_SEED } from "@/lib/seed";
 
 export const runtime = "nodejs";
 
 export async function POST() {
+  const g = await guard(["ADMIN"]);
+  if ("error" in g) return g.error;
   try {
     await getStore().resetDemo({ vendors: VENDOR_MASTER_SEED });
     return NextResponse.json({ ok: true });

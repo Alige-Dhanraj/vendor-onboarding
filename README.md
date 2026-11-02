@@ -56,6 +56,20 @@ npm run e2e       # full workflow on the real SAMPLE files: 12 scenarios, resubm
 
 With `OPENAI_API_KEY` set, `npm run e2e` makes the AI read the actual files, so it doubles as the accuracy test.
 
+## Sign-in and roles
+
+Every page and API route needs a signed-in user. Three demo accounts (fictional names) share one password, set by you:
+
+| Account | Role | Can |
+| --- | --- | --- |
+| buyer@vendorgate.example | Buyer | Submit vendors, view results; flagged cases are read-only |
+| reviewer@vendorgate.example | Reviewer | Everything a Buyer can, plus decide flagged cases |
+| admin@vendorgate.example | Admin | Everything, plus reset demo data |
+
+Set `SESSION_SECRET` (long random text) and `DEMO_PASSWORD` in the environment. Without them, nobody can sign in in production.
+Sessions are signed cookies (HMAC), valid 12 hours. Reviewer names on audit records come from the session, not the request.
+Production would use single sign-on and a real user table; that is listed as the next step.
+
 ## Set up Supabase
 
 1. Create a project at supabase.com.
@@ -69,7 +83,7 @@ service-role key. Re-running `seed.sql` resets the demo data.
 
 1. Push this repo to GitHub and import it in Vercel.
 2. Add environment variables: `OPENAI_API_KEY`, `OPENAI_MODEL` (a vision-capable model on your account),
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DEMO_PACING_MS=400`.
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, `DEMO_PASSWORD`, `DEMO_PACING_MS=400`.
 3. Deploy. The run endpoint allows up to 300 s (the Hobby maximum); a run normally takes well under a minute.
 
 ## Demo scenarios (sample picker on the home page)

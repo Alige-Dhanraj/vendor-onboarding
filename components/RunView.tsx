@@ -13,6 +13,8 @@ export default function RunView({ id }: { id: string }) {
   const [data, setData] = useState<Bundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((j) => setRole(j.role ?? null)).catch(() => {}); }, []);
 
   async function load() {
     const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
@@ -87,7 +89,9 @@ export default function RunView({ id }: { id: string }) {
 
         <div className="space-y-6">
           <OutcomeBanner run={run} status={status} running={running} checks={checks} message={message} email={form.contact?.email} vendorRef={submission.vendor_ref} version={submission.version} scenario={scenario} />
-          {!running && run.review_flag && <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />}
+          {!running && run.review_flag && (role === "REVIEWER" || role === "ADMIN" || reviewer_actions.length > 0
+            ? <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />
+            : role ? <Card className="border-orange-200 p-5 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
           {checks.length > 0 && <Checks checks={checks} />}
         </div>
       </div>

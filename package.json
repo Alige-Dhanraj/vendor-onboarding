@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/engine.test.ts",
+    "test": "tsx --test tests/engine.test.ts tests/auth.test.ts",
     "e2e": "tsx scripts/scenarios-e2e.ts",
     "seed:sql": "tsx scripts/gen-seed.ts",
     "docs:samples": "tsx scripts/export-scenarios.ts && python3 scripts/make_documents.py && cp test-data/documents/* public/samples/"
