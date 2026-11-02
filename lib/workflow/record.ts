@@ -11,6 +11,7 @@ export interface ExportRecord {
   street: string; city: string; state: string; postal_code: string;
   contact_name: string; contact_email: string; contact_phone: string; alt_phone: string;
   verified_at: string; verified_by: string; run_id: string; version: number;
+  status: "Active" | "Inactive"; inactive_reason: string;
 }
 
 export const isApproved = (b: RunBundle) => effectiveStatus(b.run) === "APPROVED";
@@ -28,6 +29,7 @@ export function buildRecord(b: RunBundle): ExportRecord {
     verified_at: b.run.finished_at ?? b.run.started_at,
     verified_by: approver ? approver.reviewer : "VendorGate automatic checks",
     run_id: b.run.id, version: b.submission.version,
+    status: b.vendor?.active === false ? "Inactive" : "Active", inactive_reason: b.vendor?.active === false ? b.vendor.reason ?? "" : "",
   };
 }
 
@@ -37,7 +39,11 @@ const esc = (v: unknown) => {
   if (/^[=@]|^[+-](?![\d\s])/.test(s)) s = "'" + s;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
-export function recordCsv(r: ExportRecord): string {
-  const keys = Object.keys(r) as (keyof ExportRecord)[];
-  return `${keys.join(",")}\n${keys.map((k) => esc(r[k])).join(",")}\n`;
+const COLUMNS: (keyof ExportRecord)[] = [
+  "vendor_ref", "legal_name", "trade_name", "entity_type", "country", "pan", "gstin", "ein", "bank_account_holder", "bank_account_last4", "ifsc", "routing_number",
+  "street", "city", "state", "postal_code", "contact_name", "contact_email", "contact_phone", "alt_phone", "verified_at", "verified_by", "run_id", "version", "status", "inactive_reason",
+];
+export function recordsCsv(rs: ExportRecord[]): string {
+  return `${COLUMNS.join(",")}\n${rs.map((r) => COLUMNS.map((k) => esc(r[k])).join(",")).join("\n")}${rs.length ? "\n" : ""}`;
 }
+export const recordCsv = (r: ExportRecord) => recordsCsv([r]);

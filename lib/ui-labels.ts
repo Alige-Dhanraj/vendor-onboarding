@@ -25,6 +25,7 @@ export const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
   PENDING_INFO: { label: "Waiting on vendor", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
   MANUAL_REVIEW: { label: "Needs review", cls: "bg-orange-50 text-orange-800 ring-orange-200" },
   REJECTED: { label: "Rejected", cls: "bg-rose-50 text-rose-800 ring-rose-200" },
+  INACTIVE: { label: "Inactive", cls: "bg-slate-100 text-slate-500 ring-slate-200" },
   RUNNING: { label: "Checking…", cls: "bg-slate-100 text-slate-700 ring-slate-200" },
   FAILED: { label: "Check failed", cls: "bg-rose-50 text-rose-800 ring-rose-200" },
 };
@@ -44,6 +45,10 @@ export const SLOT_LABEL: Record<string, string> = {
   BANK_PROOF: "Cancelled cheque / bank letter",
   EIN_NOTICE: "IRS EIN notice",
 };
+
+/** Status shown in lists: an approved vendor that was deactivated shows as Inactive. */
+export const listStatus = (r: { status: string; final_status?: string | null; internal_status?: string | null; inactive?: boolean }) =>
+  r.inactive ? "INACTIVE" : effectiveStatus(r);
 
 export const fmtMs = (ms?: number | null) => (ms == null ? "" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 

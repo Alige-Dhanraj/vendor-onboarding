@@ -88,14 +88,22 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     async getRun(id) {
       const run = must(await db.from("runs").select().eq("id", id).maybeSingle(), "read run") as RunRow | null;
       if (!run) return null;
-      const [submission, documents, events, checks, messages, actions] = await Promise.all([
+      const [submission, documents, events, checks, messages, actions, vm] = await Promise.all([
         db.from("submissions").select().eq("id", run.submission_id).single(),
         db.from("documents").select().eq("submission_id", run.submission_id).order("created_at"),
         db.from("run_events").select().eq("run_id", id).order("seq"),
         db.from("check_results").select().eq("run_id", id).order("id"),
         db.from("messages").select().eq("run_id", id).order("created_at", { ascending: false }).limit(1),
         db.from("reviewer_actions").select().eq("run_id", id).order("created_at"),
+        db.from("vendor_master").select("id, active, inactive_reason, inactive_by, inactive_at").eq("source_run_id", id).limit(1),
       ]);
+      // Both lookups below are optional: if their tables or columns are missing (migration not run yet), the page still works.
+      const vmRow = (vm.data as any[] | null)?.[0];
+      let invite_token: string | null = null;
+      if (run.status !== "RUNNING" && (submission.data as any)?.vendor_ref) {
+        const inv = await db.from("invites").select("token").eq("vendor_ref", (submission.data as any).vendor_ref).limit(1);
+        invite_token = (inv.data as any[] | null)?.[0]?.token ?? null;
+      }
       const checkRows = must(checks, "read checks") as any[];
       return {
         run,
@@ -108,12 +116,16 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
         })),
         message: (must(messages, "read message") as any[])[0] ?? null,
         reviewer_actions: must(actions, "read actions") as any[],
+        vendor: vmRow ? { id: vmRow.id, active: vmRow.active !== false, reason: vmRow.inactive_reason ?? null, by: vmRow.inactive_by ?? null, at: vmRow.inactive_at ?? null } : null,
+        invite_token,
       };
     },
     async listRuns(limit = 200) {
       const rows = must(await db.from("runs").select("*, submissions(vendor_ref, version, scenario_id, form_data)").order("started_at", { ascending: false }).limit(limit), "list runs") as any[];
+      const off = await db.from("vendor_master").select("source_run_id").eq("active", false);
+      const inactiveRuns = new Set(((off.data as any[] | null) ?? []).map((x) => x.source_run_id));
       return rows.map(({ submissions: s, ...r }) => ({
-        ...r, vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null, contact_name: s?.form_data?.contact?.name ?? "", contact_email: s?.form_data?.contact?.email ?? "",
+        ...r, inactive: inactiveRuns.has(r.id), vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null, contact_name: s?.form_data?.contact?.name ?? "", contact_email: s?.form_data?.contact?.email ?? "",
       })) as RunListItem[];
     },
     async addReviewerAction(a) {
@@ -121,7 +133,16 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     },
 
     async getVendorMaster() {
+      const full = await db.from("vendor_master").select("id, legal_name, pan, gstin, bank_account_hash, bank_last4, active").order("id");
+      if (!full.error) return full.data as VendorRecord[];
       return must(await db.from("vendor_master").select("id, legal_name, pan, gstin, bank_account_hash, bank_last4").order("id"), "read vendor master") as VendorRecord[];
+    },
+    async setVendorActive(runId, active, { reason, by }) {
+      const rows = must(await db.from("vendor_master").update({ active, inactive_reason: active ? null : reason, inactive_by: active ? null : by, inactive_at: active ? null : new Date().toISOString() }).eq("source_run_id", runId).select("id"), "update vendor") as { id: string }[];
+      return rows[0]?.id ?? null;
+    },
+    async addBlocklist(e) {
+      must(await db.from("blocklist").insert({ name: e.name ?? null, pan: e.pan ?? null, bank_account_hash: e.bank_account_hash ?? null, reason: e.reason }), "add to blocklist");
     },
     async addVendor(v, runId) {
       must(await db.from("vendor_master").insert({ ...v, source_run_id: runId }), "add vendor");
@@ -140,12 +161,16 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       for (const r of rows) { const e = m.get(r.check_id) ?? { check_id: r.check_id, title: r.title, runs: new Set<string>() }; e.runs.add(r.run_id); m.set(r.check_id, e); }
       return [...m.values()].map((e) => ({ check_id: e.check_id, title: e.title, runs: e.runs.size })).sort((a, b) => b.runs - a.runs);
     },
-    async resetDemo({ vendors }) {
+    async resetDemo({ vendors, blocklist }) {
       // Deletes all submissions (runs, events, checks, messages, reviewer actions cascade) and restores the seed vendors.
       must(await db.from("invites").delete().not("token", "is", null), "clear invites");
       must(await db.from("submissions").delete().not("id", "is", null), "clear submissions");
       must(await db.from("vendor_master").delete().not("id", "is", null), "clear vendor master");
       must(await db.from("vendor_master").insert(vendors), "restore vendors");
+      if (blocklist) {
+        must(await db.from("blocklist").delete().not("id", "is", null), "clear blocklist");
+        if (blocklist.length) must(await db.from("blocklist").insert(blocklist.map((b) => ({ name: b.name ?? null, pan: b.pan ?? null, bank_account_hash: b.bank_account_hash ?? null, reason: b.reason }))), "restore blocklist");
+      }
     },
     async cacheGet<T>(key: string) {
       const row = must(await db.from("ai_cache").select("value").eq("key", key).maybeSingle(), "read cache") as { value: T } | null;

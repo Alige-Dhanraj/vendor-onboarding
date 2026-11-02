@@ -25,8 +25,9 @@ export interface RunEventRow {
   detail: string | null; duration_ms: number | null; at: string;
 }
 export interface MessageRow { run_id: string; subject: string; body: string; analyst_summary: string | null; generated_by: string; created_at: string }
-export interface ReviewerActionRow { id: string; run_id: string; action: "APPROVE" | "REJECT" | "REQUEST_INFO"; reason: string; reviewer: string; created_at: string }
+export interface ReviewerActionRow { id: string; run_id: string; action: "APPROVE" | "REJECT" | "REQUEST_INFO" | "DEACTIVATE" | "REACTIVATE"; reason: string; reviewer: string; created_at: string }
 export type CheckRow = CheckResult & { run_id: string };
+export interface VendorInfo { id: string; active: boolean; reason: string | null; by: string | null; at: string | null }
 
 export interface RunBundle {
   run: RunRow;
@@ -36,10 +37,14 @@ export interface RunBundle {
   checks: CheckResult[];
   message: MessageRow | null;
   reviewer_actions: ReviewerActionRow[];
+  /** The approved-vendor record created from this run, if any. */
+  vendor: VendorInfo | null;
+  /** Secret link token if the vendor came in through an invite link. */
+  invite_token: string | null;
 }
 
 export interface RunListItem extends RunRow {
-  vendor_ref: string; legal_name: string; version: number; scenario_id: string | null; gstin: string | null; contact_name: string; contact_email: string;
+  vendor_ref: string; legal_name: string; version: number; scenario_id: string | null; gstin: string | null; contact_name: string; contact_email: string; inactive: boolean;
 }
 
 export interface InviteRow {
@@ -77,13 +82,16 @@ export interface Store {
   // reference data
   getVendorMaster(): Promise<VendorRecord[]>;
   addVendor(v: VendorRecord, runId: string): Promise<void>;
+  /** Marks the vendor created from this run active or inactive. Returns the vendor id, or null if the run created none. */
+  setVendorActive(runId: string, active: boolean, info: { reason: string; by: string }): Promise<string | null>;
+  addBlocklist(e: BlocklistEntry): Promise<void>;
   getBlocklist(): Promise<BlocklistEntry[]>;
   getRegistry(): Promise<TestRegistry>;
 
   issueCounts(): Promise<{ check_id: string; title: string; runs: number }[]>;
 
   // demo
-  resetDemo(seed: { vendors: VendorRecord[] }): Promise<void>;
+  resetDemo(seed: { vendors: VendorRecord[]; blocklist?: BlocklistEntry[] }): Promise<void>;
 
   // AI cache
   cacheGet<T>(key: string): Promise<T | null>;

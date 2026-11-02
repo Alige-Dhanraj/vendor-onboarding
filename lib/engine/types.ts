@@ -63,6 +63,8 @@ export interface VendorRecord {
   gstin?: string;
   bank_account_hash: string;
   bank_last4: string;
+  /** false once a reviewer has deactivated the vendor. Inactive vendors still count for duplicate checks. */
+  active?: boolean;
 }
 
 export interface BlocklistEntry {

@@ -272,3 +272,48 @@ test("vendor page states and fix list", async () => {
   assert.equal(vendorState(run({ internal_status: "REJECTED" })), "REJECTED");
   assert.deepEqual(fixList("Hi A,\n\nPlease fix:\n\n1. **PAN**: bad\n2. **IFSC**: bad\n\nThanks"), ["**PAN**: bad", "**IFSC**: bad"]);
 });
+
+test("deactivate and reactivate: records kept, inactive vendors still block duplicates", async () => {
+  const { createMemoryStore } = await import("../lib/store/memory");
+  const { submit } = await import("../lib/workflow/intake");
+  const { executeRun, aiMode } = await import("../lib/workflow/run");
+  const { changeVendorStatus } = await import("../lib/workflow/vendors");
+  const sc = SCENARIOS[0];
+  const fresh = () => createMemoryStore({ vendors: VENDOR_MASTER_SEED, blocklist: [...BLOCKLIST_SEED], registry: TEST_REGISTRY });
+  const approve = async (store: ReturnType<typeof fresh>, ref: string) => {
+    const files = sc.docs.map((d) => ({ slot: d.slot, name: d.file_name, mime: "image/png", bytes: new Uint8Array(Buffer.from(`${ref}-${d.file_name}`)) }));
+    const sub = await submit(store, { form: sc.form, vendorRef: ref, scenarioId: sc.id, files });
+    const run = await store.createRun(sub.id, aiMode());
+    await executeRun(store, run.id);
+    return run.id;
+  };
+
+  const a = fresh();
+  const id = await approve(a, "kv1");
+  assert.equal((await a.getRun(id))!.vendor!.active, true);
+  await assert.rejects(changeVendorStatus(a, { runId: id, action: "DEACTIVATE", reason: "Other", note: "", by: "T" }), /at least 10/);
+  await assert.rejects(changeVendorStatus(a, { runId: id, action: "REACTIVATE", by: "T" }), /already active/);
+  await changeVendorStatus(a, { runId: id, action: "DEACTIVATE", reason: "Trade completed", note: "contract ended", by: "T" });
+  const off = (await a.getRun(id))!;
+  assert.equal(off.vendor!.active, false);
+  assert.equal(off.vendor!.reason, "Trade completed: contract ended");
+  assert.ok(off.reviewer_actions.some((x) => x.action === "DEACTIVATE"), "audit log has the action");
+  assert.equal((await a.listRuns()).find((r) => r.id === id)!.inactive, true);
+
+  // the same company applying again is still a duplicate, and the reviewer is pointed to reactivate
+  const dup = await approve(a, "kv2");
+  const r2 = (await a.getRun(dup))!.checks.find((c) => c.id === "R2")!;
+  assert.equal(r2.status, "FAIL");
+  assert.match(r2.next_action, /inactive: reactivate/);
+
+  await changeVendorStatus(a, { runId: id, action: "REACTIVATE", note: "new contract", by: "T" });
+  assert.equal((await a.getRun(id))!.vendor!.active, true);
+
+  // fraud: blocklisted, cannot be reactivated
+  const b = fresh();
+  const bid = await approve(b, "kv3");
+  await changeVendorStatus(b, { runId: bid, action: "DEACTIVATE", reason: "Fraud concern", note: "", by: "T" });
+  assert.ok((await b.getBlocklist()).some((e) => e.name === sc.form.legal_name), "added to the blocklist");
+  await assert.rejects(changeVendorStatus(b, { runId: bid, action: "REACTIVATE", by: "T" }), /fraud/);
+  assert.equal(BLOCKLIST_SEED.some((e) => e.name === sc.form.legal_name), false, "the shared seed list is not changed");
+});

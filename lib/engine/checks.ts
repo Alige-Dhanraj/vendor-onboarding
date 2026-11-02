@@ -404,9 +404,13 @@ function r2(ctx: CheckContext): CheckResult {
   if (dup) {
     return result(b, "FAIL", "HARD_STOP", {
       sources: [formSrc(`PAN ${pan || "-"} · GSTIN ${gstin || "-"}`), { label: "Vendor master", value: `${dup.legal_name} (${dup.id}): PAN ${dup.pan ?? "-"} · GSTIN ${dup.gstin ?? "-"}` }],
-      reason: `This ${dup.gstin === gstin && gstin ? "GSTIN" : "PAN"} is already registered to existing vendor "${dup.legal_name}" (${dup.id}).`,
-      next_action: `Rejected as a duplicate. Point the requester to existing record ${dup.id} instead of creating a second vendor.`,
-      vendor_fix: "You are already registered with us, so we can't create a second record.",
+      reason: `This ${dup.gstin === gstin && gstin ? "GSTIN" : "PAN"} is already registered to existing vendor "${dup.legal_name}" (${dup.id})${dup.active === false ? ", who is currently inactive" : ""}.`,
+      next_action: dup.active === false
+        ? `Rejected as a duplicate. ${dup.id} is inactive: reactivate that record instead of creating a second vendor.`
+        : `Rejected as a duplicate. Point the requester to existing record ${dup.id} instead of creating a second vendor.`,
+      vendor_fix: dup.active === false
+        ? "You were registered with us before, so we can't create a second record. Our team will get in touch if it can be reopened."
+        : "You are already registered with us, so we can't create a second record.",
     });
   }
   const similar = f.legal_name ? ctx.vendorMaster.find((v) => nameSimilarity(v.legal_name, f.legal_name) >= 0.75) : undefined;

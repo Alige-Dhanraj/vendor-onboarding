@@ -13,6 +13,9 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
   const messages: MessageRow[] = [];
   const actions: ReviewerActionRow[] = [];
   const invites: InviteRow[] = [];
+  const blocklist = [...seed.blocklist];
+  const vmeta = new Map<string, { run_id: string; active: boolean; reason?: string; by?: string; at?: string }>();
+  const isInactive = (runId: string) => [...vmeta.values()].some((m) => m.run_id === runId && !m.active);
   const vendors = seed.vendors.map((v) => ({ ...v }));
   const files = new Map<string, Uint8Array>();
   const cache = new Map<string, unknown>();
@@ -79,12 +82,17 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
         checks: checks.filter((c) => c.run_id === id).map(({ run_id: _r, ...c }) => c),
         message: messages.filter((m) => m.run_id === id).at(-1) ?? null,
         reviewer_actions: actions.filter((a) => a.run_id === id),
+        vendor: (() => {
+          const e = [...vmeta.entries()].find(([, m]) => m.run_id === id);
+          return e ? { id: e[0], active: e[1].active, reason: e[1].reason ?? null, by: e[1].by ?? null, at: e[1].at ?? null } : null;
+        })(),
+        invite_token: invites.find((i) => i.vendor_ref === submission.vendor_ref)?.token ?? null,
       };
     },
     async listRuns(limit = 100) {
       return [...runs].reverse().slice(0, limit).map((r) => {
         const s = subs.find((x) => x.id === r.submission_id)!;
-        return { ...r, vendor_ref: s.vendor_ref, legal_name: s.form_data.legal_name, version: s.version, scenario_id: s.scenario_id, gstin: s.form_data.tax.gstin ?? null, contact_name: s.form_data.contact.name, contact_email: s.form_data.contact.email };
+        return { ...r, vendor_ref: s.vendor_ref, legal_name: s.form_data.legal_name, version: s.version, scenario_id: s.scenario_id, gstin: s.form_data.tax.gstin ?? null, contact_name: s.form_data.contact.name, contact_email: s.form_data.contact.email, inactive: isInactive(r.id) };
       });
     },
     async addReviewerAction(a) {
@@ -93,9 +101,16 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
       return row;
     },
 
-    async getVendorMaster() { return vendors.map((v) => ({ ...v })); },
-    async addVendor(v) { vendors.push(v); },
-    async getBlocklist() { return seed.blocklist; },
+    async getVendorMaster() { return vendors.map((v) => ({ ...v, active: vmeta.get(v.id)?.active ?? true })); },
+    async addVendor(v, runId) { vendors.push(v); vmeta.set(v.id, { run_id: runId, active: true }); },
+    async setVendorActive(runId, active, { reason, by }) {
+      const e = [...vmeta.entries()].find(([, m]) => m.run_id === runId);
+      if (!e) return null;
+      vmeta.set(e[0], { run_id: runId, active, reason: active ? undefined : reason, by: active ? undefined : by, at: active ? undefined : now() });
+      return e[0];
+    },
+    async addBlocklist(e) { blocklist.push(e); },
+    async getBlocklist() { return blocklist; },
     async getRegistry() { return seed.registry; },
 
     async issueCounts() {
@@ -106,8 +121,10 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
       }
       return [...m.values()].map((e) => ({ check_id: e.check_id, title: e.title, runs: e.runs.size })).sort((a, b) => b.runs - a.runs);
     },
-    async resetDemo({ vendors: seedVendors }) {
+    async resetDemo({ vendors: seedVendors, blocklist: seedBlock }) {
       invites.length = 0;
+      vmeta.clear();
+      if (seedBlock) blocklist.splice(0, blocklist.length, ...seedBlock);
       subs.length = 0; docs.length = 0; runs.length = 0; events.length = 0; checks.length = 0; messages.length = 0; actions.length = 0;
       vendors.length = 0; vendors.push(...seedVendors.map((v) => ({ ...v }))); runNo = 0;
     },

@@ -2,11 +2,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { PLAIN, ago, effectiveStatus } from "@/lib/ui-labels";
+import { PLAIN, ago, listStatus } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { StatusBadge, inputCls } from "./ui";
 
-const CHIPS: [string, string][] = [["all", "All"], ["review", "Needs review"], ["PENDING_INFO", "Waiting"], ["APPROVED", "Approved"], ["REJECTED", "Rejected"]];
+const CHIPS: [string, string][] = [["all", "All"], ["review", "Needs review"], ["PENDING_INFO", "Waiting"], ["APPROVED", "Approved"], ["REJECTED", "Rejected"], ["INACTIVE", "Inactive"]];
 
 export default function Vendors() {
   const params = useSearchParams();
@@ -16,9 +16,10 @@ export default function Vendors() {
 
   const rows = (data ? latestPerVendor(data.runs) : []).filter((r: any) => {
     if (q && !`${r.legal_name} ${r.gstin ?? ""} ${r.vendor_ref}`.toLowerCase().includes(q.toLowerCase())) return false;
-    if (filter === "all") return true;
+    const st = listStatus(r);
+    if (filter === "all") return q ? true : st !== "INACTIVE"; // inactive vendors stay out of the way unless searched for
     if (filter === "review") return r.review_flag && !r.review_resolved && r.status !== "RUNNING";
-    return effectiveStatus(r) === filter;
+    return st === filter;
   });
   const done = data ? data.runs.filter((r: any) => r.status !== "RUNNING").length : 0;
 
@@ -31,6 +32,8 @@ export default function Vendors() {
           <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3.5 py-1.5 text-sm ${filter === k ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}>{label}</button>
         ))}
       </div>
+
+      <div className="text-right"><a href="/api/vendors/export" className="text-sm text-indigo-600 hover:underline">Download approved vendors (CSV)</a></div>
 
       <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer px-5 py-3 text-sm font-semibold text-slate-700">Why vendors get stuck</summary>
@@ -62,7 +65,7 @@ export default function Vendors() {
                     <div className="truncate font-medium text-slate-900">{r.legal_name || "Unnamed vendor"}</div>
                     <div className="truncate text-sm text-slate-500">{r.headline ?? "Checking…"}</div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1"><StatusBadge status={effectiveStatus(r)} /><span className="text-xs text-slate-400">{ago(r.started_at)}</span></div>
+                  <div className="flex shrink-0 flex-col items-end gap-1"><StatusBadge status={listStatus(r)} /><span className="text-xs text-slate-400">{ago(r.started_at)}</span></div>
                 </Link>
               </li>
             ))}

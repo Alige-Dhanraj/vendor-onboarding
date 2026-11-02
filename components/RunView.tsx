@@ -68,7 +68,8 @@ export default function RunView({ id }: { id: string }) {
   if (error) return <Card className="mx-auto max-w-3xl p-6 text-sm text-rose-700">{error}</Card>;
   if (!data) return <div className="mx-auto max-w-3xl space-y-4"><div className="h-9 w-72 animate-pulse rounded bg-slate-200" /><div className="h-40 animate-pulse rounded-xl bg-slate-100" /></div>;
 
-  const { run, submission, events, checks, documents, message, reviewer_actions } = data;
+  const { run, submission, events, checks, documents, message, reviewer_actions, vendor } = data;
+  const inactive = vendor?.active === false;
   const form = submission.form_data;
   const status = effectiveStatus(run);
   const running = run.status === "RUNNING";
@@ -79,7 +80,7 @@ export default function RunView({ id }: { id: string }) {
   const needsDecision = !running && run.review_flag && !run.review_resolved;
   const email = form.contact?.email;
 
-  const nextStep = status === "MANUAL_REVIEW" ? (canDecide ? "Check the problem below, then decide." : "A reviewer will decide this one.") : NEXT_STEP[status];
+  const nextStep = inactive ? "This vendor is inactive. A reviewer can reactivate it." : status === "MANUAL_REVIEW" ? (canDecide ? "Check the problem below, then decide." : "A reviewer will decide this one.") : NEXT_STEP[status];
   const resubmit = `/new?vendor_ref=${encodeURIComponent(submission.vendor_ref)}${submission.scenario_id ? `&scenario=${submission.scenario_id}&v=2&demo=1` : ""}`;
 
   return (
@@ -97,17 +98,17 @@ export default function RunView({ id }: { id: string }) {
         </Card>
       ) : (
         <>
-          <div className={`rounded-xl border p-5 ${{ APPROVED: "border-emerald-200 bg-emerald-50/60", PENDING_INFO: "border-amber-200 bg-amber-50/60", MANUAL_REVIEW: "border-orange-200 bg-orange-50/60", REJECTED: "border-rose-200 bg-rose-50/60", FAILED: "border-rose-200 bg-rose-50/60" }[status as string] ?? ""}`}>
-            <StatusBadge status={status} size="lg" />
+          <div className={`rounded-xl border p-5 ${{ APPROVED: "border-emerald-200 bg-emerald-50/60", PENDING_INFO: "border-amber-200 bg-amber-50/60", MANUAL_REVIEW: "border-orange-200 bg-orange-50/60", REJECTED: "border-rose-200 bg-rose-50/60", FAILED: "border-rose-200 bg-rose-50/60", INACTIVE: "border-slate-200 bg-slate-50" }[(inactive ? "INACTIVE" : status) as string] ?? ""}`}>
+            <StatusBadge status={inactive ? "INACTIVE" : status} size="lg" />
             <p className="mt-3 text-base font-medium text-slate-900">{run.headline}</p>
             <p className="mt-1 text-sm text-slate-600">{nextStep}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {status === "APPROVED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
-              {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send to vendor</a>}
+              {status === "APPROVED" && !inactive && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
+              {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, withLink(message, data.invite_token))}>Send to vendor</a>}
               {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
               {status === "PENDING_INFO" && <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link>}
-              {status === "APPROVED" && <Link className={btnSecondary} href="/new">Next vendor</Link>}
+              {status === "APPROVED" && !inactive && <Link className={btnSecondary} href="/new">Next vendor</Link>}
             </div>
             <div className="mt-3 text-xs text-slate-500">
               Checked in {fmtMs(run.duration_ms)} · <button className="underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
@@ -136,7 +137,8 @@ export default function RunView({ id }: { id: string }) {
       )}
 
       {!running && status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
-      {message && <MessageCard message={message} email={email} />}
+      {vendor && status === "APPROVED" && <VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} />}
+      {message && <MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} />}
 
       {documents.length > 0 && (
         <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -400,6 +402,64 @@ function RecordCard({ id, form, actions }: { id: string; form: any; actions: any
         <button className={btnSecondary} onClick={send} disabled={busy}>{busy ? "Sending…" : "Send to accounting system"}</button>
         {note && <span className={`text-sm ${note.ok ? "text-emerald-700" : "text-rose-700"}`}>{note.text}</span>}
       </div>
+    </Card>
+  );
+}
+
+/** If the vendor came in through a link, the "fix this" email points them to their page instead of asking for a reply. */
+function withLink(m: any, token?: string | null) {
+  if (!m || !token || typeof window === "undefined") return m;
+  const link = `${window.location.origin}/invite/${token}`;
+  return { ...m, body: String(m.body).replace(/Just reply to this email[^\n]*/, `Fix it here and send again: ${link}\n\nThank you!`) };
+}
+
+const REASONS = ["Trade completed", "Duplicate vendor", "Fraud concern", "Other"];
+
+function VendorLifecycle({ id, vendor, canDecide, onDone }: { id: string; vendor: { id: string; active: boolean; reason: string | null; by: string | null; at: string | null }; canDecide: boolean; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState(REASONS[0]);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const fraud = /^Fraud concern/.test(vendor.reason ?? "");
+  if (vendor.active && !canDecide) return null;
+
+  async function go(action: "DEACTIVATE" | "REACTIVATE") {
+    setBusy(true); setErr(null);
+    const res = await fetch(`/api/runs/${id}/vendor`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, reason, note }) });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(json.error ?? "Could not update the vendor.");
+    setOpen(false); setNote(""); onDone();
+  }
+
+  return (
+    <Card className="p-5">
+      <SectionTitle hint={vendor.id}>Vendor status</SectionTitle>
+      {!vendor.active ? (
+        <>
+          <p className="text-sm text-slate-700"><b>Inactive</b>{vendor.at ? ` since ${new Date(vendor.at).toLocaleDateString()}` : ""}{vendor.by ? ` · ${vendor.by}` : ""}</p>
+          {vendor.reason && <p className="mt-1 text-sm text-slate-600">{vendor.reason}</p>}
+          {canDecide && !fraud && <button className={`${btnSecondary} mt-3`} disabled={busy} onClick={() => go("REACTIVATE")}>Reactivate vendor</button>}
+          {fraud && <p className="mt-2 text-xs text-slate-500">Deactivated for a fraud concern, so it can't be reactivated here.</p>}
+        </>
+      ) : !open ? (
+        <>
+          <p className="text-sm text-slate-700"><b>Active</b>. Deactivate this vendor when the work with them is over. Their records are kept.</p>
+          <button className={`${btnSecondary} mt-3`} onClick={() => setOpen(true)}>Deactivate vendor</button>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <select className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)}>{REASONS.map((r) => <option key={r}>{r}</option>)}</select>
+          <textarea className={`${inputCls} min-h-[64px]`} placeholder={reason === "Other" ? "Why? (required)" : "Note (optional)"} value={note} onChange={(e) => setNote(e.target.value)} />
+          {reason === "Fraud concern" && <p className="text-xs text-rose-700">This also adds the vendor to the blocklist and can't be undone here.</p>}
+          <div className="flex gap-2">
+            <button className={btnPrimary} disabled={busy || (reason === "Other" && note.trim().length < 5)} onClick={() => go("DEACTIVATE")}>{busy ? "Saving…" : "Deactivate"}</button>
+            <button className={btnSecondary} onClick={() => { setOpen(false); setErr(null); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {err && <p className="mt-2 text-sm text-rose-700">{err}</p>}
     </Card>
   );
 }

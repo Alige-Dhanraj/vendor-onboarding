@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { reminderMessage } from "@/lib/engine/message";
-import { effectiveStatus, mailtoLink, waiting } from "@/lib/ui-labels";
+import { effectiveStatus, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { StatusBadge } from "./ui";
 
@@ -26,7 +26,7 @@ export default function Home({ firstName }: { firstName: string }) {
   const review = latest?.filter((r: any) => r.review_flag && !r.review_resolved) ?? [];
   const waits = latest?.filter((r: any) => effectiveStatus(r) === "PENDING_INFO") ?? [];
   const weekAgo = Date.now() - 7 * 864e5;
-  const approved = latest?.filter((r: any) => effectiveStatus(r) === "APPROVED" && new Date(r.started_at).getTime() >= weekAgo) ?? [];
+  const approved = latest?.filter((r: any) => listStatus(r) === "APPROVED" && new Date(r.started_at).getTime() >= weekAgo) ?? [];
   const todo = [...review.map((r: any) => ({ r, kind: "review" })), ...waits.map((r: any) => ({ r, kind: "wait" }))]
     .sort((a, b) => new Date(b.r.started_at).getTime() - new Date(a.r.started_at).getTime());
 
