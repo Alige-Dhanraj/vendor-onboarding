@@ -2,7 +2,8 @@
 // Row Level Security and must never reach the browser.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CheckResult, ExtractedDoc, TestRegistry, VendorRecord } from "../engine/types";
-import type { DocumentRow, RunListItem, RunRow, Store, SubmissionRow } from "./types";
+import { randomBytes } from "node:crypto";
+import type { DocumentRow, InviteRow, RunListItem, RunRow, Store, SubmissionRow } from "./types";
 
 const BUCKET = "vendor-documents";
 
@@ -19,6 +20,22 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       const prev = must(await db.from("submissions").select("version").eq("vendor_ref", vendor_ref).order("version", { ascending: false }).limit(1), "read versions") as { version: number }[];
       const version = (prev[0]?.version ?? 0) + 1;
       return must(await db.from("submissions").insert({ vendor_ref, version, scenario_id: scenario_id ?? null, form_data: form }).select().single(), "create submission") as SubmissionRow;
+    },
+    async createInvite({ contact_name, contact_email, created_by, days }) {
+      const row = { token: randomBytes(24).toString("base64url"), contact_name, contact_email, created_by, expires_at: new Date(Date.now() + days * 864e5).toISOString() };
+      return must(await db.from("invites").insert(row).select().single(), "create invite") as InviteRow;
+    },
+    async getInvite(token) {
+      return must(await db.from("invites").select().eq("token", token).maybeSingle(), "read invite") as InviteRow | null;
+    },
+    async setInviteVendorRef(token, vendorRef) {
+      must(await db.from("invites").update({ vendor_ref: vendorRef }).eq("token", token), "link invite");
+    },
+    async latestRunId(vendorRef) {
+      const subs = must(await db.from("submissions").select("id").eq("vendor_ref", vendorRef).order("version", { ascending: false }).limit(1), "read latest submission") as { id: string }[];
+      if (!subs[0]) return null;
+      const runs = must(await db.from("runs").select("id").eq("submission_id", subs[0].id).order("started_at", { ascending: false }).limit(1), "read latest run") as { id: string }[];
+      return runs[0]?.id ?? null;
     },
     async getSubmission(id) {
       return (must(await db.from("submissions").select().eq("id", id).maybeSingle(), "read submission") as SubmissionRow | null);
@@ -125,6 +142,7 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     },
     async resetDemo({ vendors }) {
       // Deletes all submissions (runs, events, checks, messages, reviewer actions cascade) and restores the seed vendors.
+      must(await db.from("invites").delete().not("token", "is", null), "clear invites");
       must(await db.from("submissions").delete().not("id", "is", null), "clear submissions");
       must(await db.from("vendor_master").delete().not("id", "is", null), "clear vendor master");
       must(await db.from("vendor_master").insert(vendors), "restore vendors");

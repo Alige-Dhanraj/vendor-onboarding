@@ -8,7 +8,7 @@ message back to the vendor for anything not approved.
 
 - The AI (OpenAI Responses API, strict JSON output) reads and classifies documents, and judges whether two names are
   the same entity when rules can't tell. Vendor messages are fixed short templates built from the verified findings: an email must never invent a requirement.
-- 21 deterministic checks in four layers (Complete, Valid, Consistent, Credible) produce the evidence.
+- 22 deterministic checks in four layers (Complete, Valid, Consistent, Credible) produce the evidence.
 - A fixed policy turns check results into the outcome. No AI score is involved.
 - Supabase stores every run, stage event, check result and reviewer action: the audit log.
 

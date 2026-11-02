@@ -43,6 +43,7 @@ export interface ExtractedFields {
   address_street?: string;
   address_city?: string;
   address_pincode?: string;
+  valid_until?: string;        // end of a printed validity period, as printed (e.g. 31/03/2026)
 }
 
 /** One uploaded document after the AI has read it. */
@@ -91,6 +92,8 @@ export interface CheckContext {
   nameJudgements: Record<string, NameJudgement>;
   /** Confidence below this is treated as "could not read reliably". */
   confidenceThreshold: number;
+  /** Today's date (YYYY-MM-DD) for expiry checks. Defaults to the real date. */
+  today?: string;
 }
 
 export type Layer = "COMPLETE" | "VALID" | "CONSISTENT" | "CREDIBLE";

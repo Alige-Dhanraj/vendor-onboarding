@@ -224,3 +224,51 @@ test("request and reminder emails are short", async () => {
   assert.ok(m.reminderMessage("").body.startsWith("Hi there,"));
   assert.ok(m.reminderMessage("Priya").body.length < 200);
 });
+
+test("R5: an expired document asks for a current one; no end date is left alone", async () => {
+  const { runChecks } = await import("../lib/engine/checks");
+  const sc = SCENARIOS.find((s) => s.id === "5-expired-document")!;
+  const mk = (v: ScenarioVersion, today?: string): CheckContext => ({
+    form: v.form, docs: v.docs.map((d) => ({ slot: d.slot, file_name: d.file_name, ...d.truth })), vendorMaster: VENDOR_MASTER_SEED,
+    blocklist: BLOCKLIST_SEED, registry: TEST_REGISTRY, nameJudgements: {}, confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD, today,
+  });
+  const r5 = (v: ScenarioVersion, today?: string) => runChecks(mk(v, today)).find((r) => r.id === "R5")!;
+  const bad = r5(sc, "2026-11-02");
+  assert.equal(bad.status, "FAIL");
+  assert.equal(bad.severity, "FIXABLE");
+  assert.match(bad.vendor_fix!, /\*\*GST certificate\*\*: ended on 30\/06\/2025/);
+  assert.equal(r5(sc, "2025-06-30").status, "PASS", "valid through its last day");
+  assert.equal(r5(sc, "2025-07-01").status, "FAIL", "expired the day after");
+  assert.equal(r5(sc.resubmission!, "2026-11-02").status, "PASS");
+  assert.equal(r5(SCENARIOS[0], "2026-11-02").status, "SKIPPED", "most documents have no end date");
+});
+
+test("resubmission keeps documents the vendor did not replace", async () => {
+  const { createMemoryStore } = await import("../lib/store/memory");
+  const { submit } = await import("../lib/workflow/intake");
+  const store = createMemoryStore({ vendors: VENDOR_MASTER_SEED, blocklist: BLOCKLIST_SEED, registry: TEST_REGISTRY });
+  const form = SCENARIOS[0].form;
+  const file = (slot: any, n: number) => ({ slot, name: `${slot}.pdf`, mime: "application/pdf", bytes: new Uint8Array([37, 80, 68, 70, n]) });
+  const v1 = await submit(store, { form, vendorRef: "t1", files: [file("GST_CERTIFICATE", 1), file("PAN_CARD", 2), file("BANK_PROOF", 3)] });
+  const v2 = await submit(store, { form, vendorRef: "t1", files: [file("PAN_CARD", 9)], keep: await store.listDocuments(v1.id) });
+  assert.equal(v2.version, 2);
+  const docs = await store.listDocuments(v2.id);
+  assert.deepEqual(docs.map((d) => d.slot).sort(), ["BANK_PROOF", "GST_CERTIFICATE", "PAN_CARD"]);
+  const old = await store.listDocuments(v1.id);
+  const same = (slot: string) => docs.find((d) => d.slot === slot)!.storage_path === old.find((d) => d.slot === slot)!.storage_path;
+  assert.ok(same("GST_CERTIFICATE") && same("BANK_PROOF"), "kept documents reuse the stored file");
+  assert.ok(!same("PAN_CARD"), "the replaced document is the new file");
+});
+
+test("vendor page states and fix list", async () => {
+  const { vendorState, fixList } = await import("../lib/workflow/invite");
+  const run = (p: object) => ({ run: { status: "COMPLETED", started_at: new Date().toISOString(), final_status: null, internal_status: null, ...p } }) as any;
+  assert.equal(vendorState(null), "NEW");
+  assert.equal(vendorState(run({ status: "RUNNING" })), "CHECKING");
+  assert.equal(vendorState(run({ status: "RUNNING", started_at: new Date(Date.now() - 600_000).toISOString() })), "IN_REVIEW", "a stuck run never leaves the vendor waiting forever");
+  assert.equal(vendorState(run({ internal_status: "PENDING_INFO" })), "NEED_INFO");
+  assert.equal(vendorState(run({ internal_status: "MANUAL_REVIEW" })), "IN_REVIEW", "internal review is not shown as a flag");
+  assert.equal(vendorState(run({ internal_status: "MANUAL_REVIEW", final_status: "APPROVED" })), "APPROVED");
+  assert.equal(vendorState(run({ internal_status: "REJECTED" })), "REJECTED");
+  assert.deepEqual(fixList("Hi A,\n\nPlease fix:\n\n1. **PAN**: bad\n2. **IFSC**: bad\n\nThanks"), ["**PAN**: bad", "**IFSC**: bad"]);
+});

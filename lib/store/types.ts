@@ -42,6 +42,10 @@ export interface RunListItem extends RunRow {
   vendor_ref: string; legal_name: string; version: number; scenario_id: string | null; gstin: string | null; contact_name: string; contact_email: string;
 }
 
+export interface InviteRow {
+  token: string; vendor_ref: string | null; contact_name: string; contact_email: string; created_by: string; created_at: string; expires_at: string;
+}
+
 export interface Store {
   // submissions and documents
   createSubmission(s: { vendor_ref: string; scenario_id?: string | null; form: SubmissionForm }): Promise<SubmissionRow>;
@@ -52,6 +56,12 @@ export interface Store {
   uploadFile(path: string, bytes: Uint8Array, mime: string): Promise<void>;
   downloadFile(path: string): Promise<Uint8Array>;
   signedUrl(path: string): Promise<string | null>;
+
+  // vendor invite links
+  createInvite(i: { contact_name: string; contact_email: string; created_by: string; days: number }): Promise<InviteRow>;
+  getInvite(token: string): Promise<InviteRow | null>;
+  setInviteVendorRef(token: string, vendorRef: string): Promise<void>;
+  latestRunId(vendorRef: string): Promise<string | null>;
 
   // runs
   createRun(submissionId: string, aiMode: string): Promise<RunRow>;

@@ -4,6 +4,8 @@ import { COOKIE, verifySessionToken } from "@/lib/auth/session";
 
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+  // The vendor's own page and its APIs are reached with a secret link, not a login.
+  if (pathname.startsWith("/invite/") || pathname.startsWith("/api/invite/")) return NextResponse.next();
   const session = await verifySessionToken(req.cookies.get(COOKIE)?.value);
 
   if (pathname === "/login") {

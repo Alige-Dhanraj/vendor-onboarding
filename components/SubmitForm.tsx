@@ -6,7 +6,7 @@ import { SCENARIOS } from "@/lib/scenarios";
 import { GST_STATE_CODES } from "@/lib/engine/ids";
 import { parseSignature } from "@/lib/engine/signature";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
-import { requestDocumentsMessage } from "@/lib/engine/message";
+import { inviteMessage } from "@/lib/engine/message";
 import { SLOT_LABEL, mailtoLink } from "@/lib/ui-labels";
 import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } from "./ui";
 
@@ -55,11 +55,17 @@ async function sampleFile(name: string): Promise<File> {
   return new File([await res.blob()], name, { type: name.endsWith(".pdf") ? "application/pdf" : "image/png" });
 }
 
-export default function SubmitForm() {
+interface InviteProps {
+  token: string; contactName: string; contactEmail: string;
+  initial?: { form: SubmissionForm; kept: { slot: DocSlot; file_name: string }[] };
+  onSubmitted: () => void;
+}
+
+export default function SubmitForm({ invite }: { invite?: InviteProps }) {
   const router = useRouter();
   const params = useSearchParams();
-  const demo = true; // test vendors always shown for now (below the form)
-  const [form, setForm] = useState<SubmissionForm>(EMPTY);
+  const demo = !invite; // test vendors always shown for now (below the form); never on the vendor's own page
+  const [form, setForm] = useState<SubmissionForm>(invite?.initial?.form ?? { ...EMPTY, contact: { ...EMPTY.contact, name: invite?.contactName ?? "", email: invite?.contactEmail ?? "" } });
   const [docs, setDocs] = useState<Doc[]>([]);
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
   const [scenarioId, setScenarioId] = useState("");
@@ -74,6 +80,10 @@ export default function SubmitForm() {
   const [reqOpen, setReqOpen] = useState(false);
   const [reqName, setReqName] = useState("");
   const [reqEmail, setReqEmail] = useState("");
+  const [link, setLink] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const keptSlots = invite?.initial?.kept ?? [];
   const fileInput = useRef<HTMLInputElement>(null);
 
   const scenario = useMemo(() => SCENARIOS.find((s) => s.id === scenarioId), [scenarioId]);
@@ -113,7 +123,7 @@ export default function SubmitForm() {
   };
 
   /** Put values into empty fields only, and highlight them as auto-filled. */
-  function fillEmpty(entries: [string, unknown][], always: string[] = []) {
+  function fillEmpty(entries: [string, unknown][], always: string[] = [], overwrite = false) {
     const filled = new Set<string>();
     setForm((prev) => {
       const next: any = structuredClone(prev);
@@ -123,9 +133,9 @@ export default function SubmitForm() {
         let o = next;
         for (const k of keys.slice(0, -1)) o = o[k];
         const cur = o[keys.at(-1)!];
-        if (cur === "" || cur === undefined || always.includes(path)) {
+        if (cur === "" || cur === undefined || overwrite || always.includes(path)) {
           o[keys.at(-1)!] = val;
-          if (!always.includes(path)) filled.add(path);
+          if (!["country", "tax.gst_registered"].includes(path) && cur !== val) filled.add(path);
         }
       }
       return next;
@@ -143,7 +153,7 @@ export default function SubmitForm() {
     try {
       const fd = new FormData();
       added.forEach((d, i) => fd.set(`file${i}`, d.file));
-      const res = await fetch("/api/prefill", { method: "POST", body: fd });
+      const res = await fetch(invite ? `/api/invite/${invite.token}/prefill` : "/api/prefill", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Could not read the documents");
       setDocs((p) => p.map((d) => {
@@ -158,11 +168,22 @@ export default function SubmitForm() {
         ["address.street", f.street], ["address.city", f.city], ["address.state", f.state], ["address.postal_code", f.pincode],
         ["tax.pan", f.pan], ["tax.gstin", f.gstin], ["tax.gst_registered", f.gst_registered], ["tax.ein", f.ein],
         ["bank.account_holder", f.account_holder], ["bank.account_number", f.account_number], ["bank.ifsc", f.ifsc],
-      ], ["country", "tax.gst_registered"]);
+      ], ["country", "tax.gst_registered"], !!invite?.initial);
     } catch (err) {
       setError((err as Error).message);
       setDocs((p) => p.map((d) => (d.reading ? { ...d, reading: false } : d)));
     } finally { setReading(false); }
+  }
+
+  async function createLink() {
+    setLinkBusy(true); setLinkError(null); setLink("");
+    try {
+      const res = await fetch("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_name: reqName, contact_email: reqEmail }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? "Could not create the link");
+      setLink(`${window.location.origin}/invite/${json.token}`);
+    } catch (err) { setLinkError((err as Error).message); }
+    finally { setLinkBusy(false); }
   }
 
   function fillFromSignature() {
@@ -183,12 +204,12 @@ export default function SubmitForm() {
       const fd = new FormData();
       fd.set("form", JSON.stringify(form));
       if (scenarioId) fd.set("scenario_id", scenarioId);
-      if (vendorRef) fd.set("vendor_ref", vendorRef);
+      if (vendorRef && !invite) fd.set("vendor_ref", vendorRef);
       for (const d of docs) fd.set(d.slot, d.file);
-      const res = await fetch("/api/submissions", { method: "POST", body: fd });
+      const res = await fetch(invite ? `/api/invite/${invite.token}/submit` : "/api/submissions", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Submission failed");
-      router.push(`/runs/${json.run_id}`);
+      if (invite) { setBusy(false); invite.onSubmitted(); } else router.push(`/runs/${json.run_id}`);
     } catch (err) { setError((err as Error).message); setBusy(false); }
   }
 
@@ -210,7 +231,7 @@ export default function SubmitForm() {
   const missing = need.filter(([, v]) => !v || !String(v).trim()).map(([k]) => k);
   const required = requiredSlots(form);
   // Loaded test vendors may be incomplete on purpose (that is the edge case being shown).
-  const needDocs = scenarioId ? [] : required.filter((s) => !docs.some((d) => d.slot === s));
+  const needDocs = scenarioId ? [] : required.filter((s) => !docs.some((d) => d.slot === s) && !keptSlots.some((k) => k.slot === s));
   const blockedBy = [...needDocs.map((s) => SLOT_LABEL[s]), ...missing];
   const hl = (path: string) => (aiFilled.has(path) ? " ring-2 ring-indigo-200 bg-indigo-50/40" : "");
   const input = (path: string, value: string, o: { mono?: boolean; upper?: boolean; disabled?: boolean; placeholder?: string } = {}) => (
@@ -254,20 +275,44 @@ export default function SubmitForm() {
                 <button type="button" className="text-xs text-slate-400 hover:text-rose-600" onClick={() => setDocs((p) => p.filter((_, j) => j !== i))}>Remove</button>
               </li>
             ))}
-            {required.filter((s) => !docs.some((d) => d.slot === s)).map((s) => (
-              <li key={s} className="flex items-center gap-3 px-3 py-2.5 text-slate-400"><span>○</span><span className="flex-1">{SLOT_LABEL[s]}</span><span className="text-xs">still needed</span></li>
-            ))}
+            {required.filter((s) => !docs.some((d) => d.slot === s)).map((s) => {
+              const kept = keptSlots.find((k) => k.slot === s);
+              return kept ? (
+                <li key={s} className="flex items-center gap-3 px-3 py-2.5">
+                  <span className="text-emerald-600">✓</span>
+                  <div className="min-w-0 flex-1"><div className="truncate font-medium text-slate-800">{SLOT_LABEL[s]}</div><div className="truncate text-xs text-slate-500">{kept.file_name} · kept from your earlier upload</div></div>
+                  <span className="text-xs text-slate-400">drop a new file to replace</span>
+                </li>
+              ) : (
+                <li key={s} className="flex items-center gap-3 px-3 py-2.5 text-slate-400"><span>○</span><span className="flex-1">{SLOT_LABEL[s]}</span><span className="text-xs">still needed</span></li>
+              );
+            })}
           </ul>
-          <div className="mt-3 text-sm">
-            <button type="button" className="text-indigo-700 hover:underline" onClick={() => setReqOpen((v) => !v)}>Don't have the files yet? Ask the vendor for them</button>
-            {reqOpen && (
-              <div className="mt-3 grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} /></Field>
-                <Field label="Vendor email"><input className={inputCls} type="email" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
-                <a className={`${btnPrimary} ${reqEmail.includes("@") ? "" : "pointer-events-none opacity-50"}`} href={mailtoLink(reqEmail, requestDocumentsMessage(reqName, required.map((s) => SLOT_LABEL[s])))}>Open email</a>
-              </div>
-            )}
-          </div>
+          {!invite && (
+            <div className="mt-3 text-sm">
+              <button type="button" className="text-indigo-700 hover:underline" onClick={() => setReqOpen((v) => !v)}>Don't have the files yet? Send the vendor a link</button>
+              {reqOpen && (
+                <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} /></Field>
+                    <Field label="Vendor email"><input className={inputCls} type="email" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
+                    <button type="button" className={btnPrimary} onClick={createLink} disabled={linkBusy || !reqName.trim() || !reqEmail.includes("@")}>{linkBusy ? "Creating…" : "Create link"}</button>
+                  </div>
+                  {link && (
+                    <div className="mt-3 space-y-2">
+                      <input readOnly className={`${inputCls} mono text-xs`} value={link} onFocus={(e) => e.currentTarget.select()} />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={btnSecondary} onClick={() => navigator.clipboard?.writeText(link)}>Copy link</button>
+                        <a className={btnPrimary} href={mailtoLink(reqEmail, inviteMessage(reqName, link))}>Open email</a>
+                      </div>
+                      <p className="text-xs text-slate-500">The vendor uploads the documents there and sees their own status. You will see them under Vendors.</p>
+                    </div>
+                  )}
+                  {linkError && <p className="mt-2 text-sm text-rose-700">{linkError}</p>}
+                </div>
+              )}
+            </div>
+          )}
           {aiFilled.size > 0 && <p className="mt-3 text-sm text-indigo-700">Filled {aiFilled.size} field{aiFilled.size > 1 ? "s" : ""} from the documents (highlighted below). Please check them.</p>}
         </Card>
 
@@ -342,8 +387,8 @@ export default function SubmitForm() {
 
       <div>
         <Card className="p-5 lg:sticky lg:top-20">
-          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || docs.length === 0 || blockedBy.length > 0}>
-            {reading ? "Reading documents…" : busy ? "Starting…" : "Check vendor"}
+          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || (docs.length === 0 && keptSlots.length === 0) || blockedBy.length > 0}>
+            {reading ? "Reading documents…" : busy ? "Sending…" : invite ? "Send for checking" : "Check vendor"}
           </button>
           {blockedBy.length > 0 && !reading && <p className="mt-2 text-xs text-slate-500">Still needed: {blockedBy.join(", ")}.</p>}
           {error && <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}

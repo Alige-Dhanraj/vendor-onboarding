@@ -21,4 +21,5 @@ export const PLAIN: Record<string, string> = {
   R2: "Already registered",
   R3: "On the blocklist",
   R4: "GST registration cancelled",
+  R5: "Document has expired",
 };

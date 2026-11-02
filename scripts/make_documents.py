@@ -75,7 +75,8 @@ def gst_certificate(path, form, fields):
         ("3. Constitution of Business", ENTITY_LABEL.get(form.get("entity_type"), "")),
         ("4. Address of Principal Place of Business", f'{a["street"]}, {a["city"]}, {fields.get("registration_state", a["state"])} - {a["postal_code"]}'),
         ("5. Date of Liability", "01/04/2021"),
-        ("6. Type of Registration", "Regular"),
+        ("6. Type of Registration", "Casual Taxable Person" if fields.get("valid_until") else "Regular"),
+        *([("Period of Validity", f'01/07/2024 to {fields["valid_until"]}')] if fields.get("valid_until") else []),
         ("7. Particulars of Approving Authority", "SAMPLE - none (synthetic)"),
     ]
     y = h - 140

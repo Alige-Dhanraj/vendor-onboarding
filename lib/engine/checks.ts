@@ -448,9 +448,42 @@ function r4(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "HARD_STOP", { sources: [src], reason: "The GST registration is cancelled in the TEST REGISTRY.", next_action: "Rejected. The vendor cannot be onboarded on a cancelled GST registration.", vendor_fix: "Your GST registration shows as cancelled." });
 }
 
+const utc = (y: number, m: number, d: number) => {
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d ? dt : null;
+};
+/** Reads YYYY-MM-DD or DD/MM/YYYY (day first, as printed in India). Anything else is not guessed. */
+export function parseDocDate(s: string): Date | null {
+  const t = s.trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return utc(+m[1], +m[2], +m[3]);
+  m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  return m ? utc(+m[3], +m[2], +m[1]) : null;
+}
+
+function r5(ctx: CheckContext): CheckResult {
+  const b: Base = { id: "R5", layer: "CREDIBLE", title: "Documents are still valid", checked: "Any validity or expiry date printed on the documents", rule: "R5: a document whose printed validity has ended must be replaced. Documents with no end date (most GST certificates and PAN cards) are not affected. Dates are read day-first (DD/MM/YYYY); a date that cannot be read is not guessed." };
+  const ref = (ctx.today && parseDocDate(ctx.today)) || new Date();
+  const todayStart = Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate());
+  const dated = ctx.docs
+    .filter((d) => usable(ctx, d) && d.fields.valid_until && (d.confidence.valid_until ?? d.overall_confidence) >= ctx.confidenceThreshold)
+    .map((d) => ({ d, raw: d.fields.valid_until!, date: parseDocDate(d.fields.valid_until!) }))
+    .filter((x) => x.date);
+  if (!dated.length) return result(b, "SKIPPED", null, { reason: "No document shows an end date." });
+  const src = (x: (typeof dated)[number]): Source => ({ label: `${DOC_LABEL[x.d.slot]} (AI-read)`, value: `valid until ${x.raw}` });
+  const expired = dated.filter((x) => x.date!.getTime() < todayStart);
+  if (!expired.length) return result(b, "PASS", null, { sources: dated.map(src), reason: "Every document with an end date is still valid." });
+  return result(b, "FAIL", "FIXABLE", {
+    sources: expired.map(src),
+    reason: `${expired.map((x) => `${DOC_LABEL[x.d.slot]} ended on ${x.raw}`).join("; ")}.`,
+    next_action: "Ask the vendor for a current copy.",
+    vendor_fix: expired.map((x) => `**${DOC_LABEL[x.d.slot]}**: ended on ${x.raw}, please send a current one`).join("\n"),
+  });
+}
+
 // ---------- run ----------
 
-export const CHECKS = [c1, c2, c3, c4, v1, v2, v3, v4, v5, v6, k1, k2, k3, k4, k5, k6, k7, r1, r2, r3, r4];
+export const CHECKS = [c1, c2, c3, c4, v1, v2, v3, v4, v5, v6, k1, k2, k3, k4, k5, k6, k7, r1, r2, r3, r4, r5];
 export const LAYERS: Layer[] = ["COMPLETE", "VALID", "CONSISTENT", "CREDIBLE"];
 
 export function runChecks(ctx: CheckContext): CheckResult[] {

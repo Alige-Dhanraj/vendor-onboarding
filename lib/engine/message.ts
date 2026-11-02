@@ -67,3 +67,11 @@ export function reminderMessage(contactName: string) {
     body: `Hi ${firstName(contactName)},\n\nA quick reminder: we're still waiting on the items in our earlier email.\n\nJust reply to this email. Thank you!`,
   };
 }
+
+/** Short email that carries the vendor's private registration link. */
+export function inviteMessage(contactName: string, link: string) {
+  return {
+    subject: "Please register as our vendor",
+    body: `Hi ${firstName(contactName)},\n\nPlease register as our vendor using this private link:\n\n${link}\n\nUpload your documents there and you can check your status at any time. It takes about 3 minutes.\n\nThank you!`,
+  };
+}

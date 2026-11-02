@@ -1,6 +1,6 @@
 // Intake: validate the uploaded files, store them privately, record the submission.
 import type { DocSlot, SubmissionForm } from "../engine/types";
-import type { Store, SubmissionRow } from "../store/types";
+import type { DocumentRow, Store, SubmissionRow } from "../store/types";
 import { sha256 } from "./run";
 
 export const MAX_FILES = 5;
@@ -12,7 +12,7 @@ export interface IncomingFile { slot: DocSlot; name: string; mime: string; bytes
 
 export class IntakeError extends Error {}
 
-const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "vendor";
+export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "vendor";
 
 export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
   if (!form || typeof form !== "object") throw new IntakeError("Missing form data.");
@@ -27,7 +27,7 @@ export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
   if (new Set(slots).size !== slots.length) throw new IntakeError("Upload one file per document slot.");
 }
 
-export async function submit(store: Store, args: { form: SubmissionForm; files: IncomingFile[]; scenarioId?: string | null; vendorRef?: string }): Promise<SubmissionRow> {
+export async function submit(store: Store, args: { form: SubmissionForm; files: IncomingFile[]; scenarioId?: string | null; vendorRef?: string; keep?: DocumentRow[] }): Promise<SubmissionRow> {
   validateIncoming(args.form, args.files);
   const vendor_ref = args.vendorRef || args.form.vendor_ref || slug(args.form.legal_name);
   const form = { ...args.form, vendor_ref };
@@ -39,6 +39,16 @@ export async function submit(store: Store, args: { form: SubmissionForm; files: 
       submission_id: sub.id, slot: f.slot, file_name: f.name, storage_path: path, mime_type: f.mime,
       size_bytes: f.bytes.byteLength, file_hash: sha256(f.bytes),
     });
+  }
+  // A resubmission keeps the earlier documents the vendor did not replace (same stored file, same reading).
+  const replaced = new Set(args.files.map((f) => f.slot));
+  for (const d of args.keep ?? []) {
+    if (replaced.has(d.slot)) continue;
+    const row = await store.addDocument({
+      submission_id: sub.id, slot: d.slot, file_name: d.file_name, storage_path: d.storage_path, mime_type: d.mime_type,
+      size_bytes: d.size_bytes, file_hash: d.file_hash,
+    });
+    if (d.extracted) await store.saveReading(row.id, d.extracted);
   }
   return sub;
 }

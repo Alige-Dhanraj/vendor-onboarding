@@ -102,6 +102,9 @@ const erode = inForm({ ref: "erode", name: "Erode Handloom Company Pvt Ltd", pan
 
 const salem = inForm({ ref: "salem", name: "Salem Steel Fab Pvt Ltd", pan: "AALCS6604G", stateCode: "33", state: "Tamil Nadu", city: "Salem", street: "7 Omalur Main Road", pin: "636007", contact: "Prakash Murugan", email: "prakash@salemsteelfab.example", phone: "+91 93600 55667", acct: "66890022233344", ifsc: "DEMO000S011" });
 
+const pune = inForm({ ref: "pune", name: "Pune Packaging Solutions Pvt Ltd", pan: "AABCP5521K", stateCode: "27", state: "Maharashtra", city: "Pune", street: "Plot 18, MIDC Bhosari", pin: "411026", contact: "Neha Kulkarni", email: "accounts@punepackaging.example", phone: "+91 98220 31457", acct: "91230044455566", ifsc: "DEMO0003345" });
+const withEnd = (d: ScenarioDoc, end: string, file: string): ScenarioDoc => ({ ...d, file_name: file, truth: { ...d.truth, fields: { ...d.truth.fields, valid_until: end }, confidence: { ...d.truth.confidence, valid_until: 0.95 } } });
+
 const bayview: SubmissionForm = {
   vendor_ref: "bayview", legal_name: "Bayview Analytics Inc", entity_type: "CORPORATION", country: "US",
   address: { street: "500 Market Street, Suite 300", city: "San Francisco", state: "California", postal_code: "94105" },
@@ -160,6 +163,18 @@ export const SCENARIOS: Scenario[] = [
     expected: { outcome: "PENDING", internal_status: "MANUAL_REVIEW", failing: ["K1", "K2"] },
   },
   {
+    id: "5-expired-document", label: "5 · Expired GST certificate", group: "edge",
+    story: "The GST certificate is for a temporary registration that ended in 2025. The system asks for a current one. The vendor resubmits and is approved.",
+    form: pune,
+    docs: [withEnd(gstCert("pune", pune.legal_name, pune.tax.gstin!, "Maharashtra", pune), "30/06/2025", "pune-gst-certificate-expired.pdf"), panCard("pune", pune.legal_name, pune.tax.pan!), cheque("pune", pune.legal_name, pune.bank.account_number, pune.bank.ifsc!)],
+    expected: { outcome: "PENDING", internal_status: "PENDING_INFO", failing: ["R5"] },
+    resubmission: {
+      form: pune,
+      docs: [withEnd(gstCert("pune", pune.legal_name, pune.tax.gstin!, "Maharashtra", pune), "31/12/2030", "pune-gst-certificate.pdf"), panCard("pune", pune.legal_name, pune.tax.pan!), cheque("pune", pune.legal_name, pune.bank.account_number, pune.bank.ifsc!)],
+      expected: { outcome: "APPROVED", internal_status: "APPROVED", failing: [] },
+    },
+  },
+  {
     id: "n1-optional-missing", label: "Negative · Optional fields blank", group: "negative",
     story: "No trade name and no MSME number. Both are optional, so this must still be approved (no false alarm).",
     form: kanchi, docs: fullSet(kanchi),
@@ -197,7 +212,7 @@ export const SCENARIOS: Scenario[] = [
 /** TEST REGISTRY: a labelled stand-in for the GST portal. */
 export const TEST_REGISTRY: TestRegistry = Object.fromEntries([
   ...VENDOR_MASTER_SEED.map((v) => [v.gstin!, { status: "ACTIVE" as const, legal_name: v.legal_name }]),
-  ...[kaveri, nilgiri, thanjavur, madurai, ganesh, arjun, kanchi, erode].map((f) => [f.tax.gstin!, { status: "ACTIVE" as const, legal_name: f.legal_name }]),
+  ...[kaveri, nilgiri, thanjavur, madurai, ganesh, arjun, kanchi, erode, pune].map((f) => [f.tax.gstin!, { status: "ACTIVE" as const, legal_name: f.legal_name }]),
   [hosurGstin, { status: "ACTIVE" as const, legal_name: hosur.legal_name }],
   [salem.tax.gstin!, { status: "CANCELLED" as const, legal_name: salem.legal_name }],
 ]);

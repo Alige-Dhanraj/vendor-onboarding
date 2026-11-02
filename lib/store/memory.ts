@@ -1,7 +1,7 @@
 // In-memory Store for tests and the offline scenario script. Same behaviour as Supabase, no persistence.
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { BlocklistEntry, TestRegistry, VendorRecord } from "../engine/types";
-import type { DocumentRow, MessageRow, ReviewerActionRow, RunEventRow, RunRow, Store, SubmissionRow, CheckRow } from "./types";
+import type { InviteRow, DocumentRow, MessageRow, ReviewerActionRow, RunEventRow, RunRow, Store, SubmissionRow, CheckRow } from "./types";
 
 export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: BlocklistEntry[]; registry: TestRegistry }): Store {
   const now = () => new Date().toISOString();
@@ -12,6 +12,7 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
   const checks: CheckRow[] = [];
   const messages: MessageRow[] = [];
   const actions: ReviewerActionRow[] = [];
+  const invites: InviteRow[] = [];
   const vendors = seed.vendors.map((v) => ({ ...v }));
   const files = new Map<string, Uint8Array>();
   const cache = new Map<string, unknown>();
@@ -25,6 +26,17 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
       return row;
     },
     async getSubmission(id) { return subs.find((s) => s.id === id) ?? null; },
+    async createInvite({ contact_name, contact_email, created_by, days }) {
+      const row: InviteRow = { token: randomBytes(24).toString("base64url"), vendor_ref: null, contact_name, contact_email, created_by, created_at: now(), expires_at: new Date(Date.now() + days * 864e5).toISOString() };
+      invites.push(row);
+      return row;
+    },
+    async getInvite(token) { return invites.find((i) => i.token === token) ?? null; },
+    async setInviteVendorRef(token, vendorRef) { const i = invites.find((x) => x.token === token); if (i) i.vendor_ref = vendorRef; },
+    async latestRunId(vendorRef) {
+      const sub = subs.filter((s) => s.vendor_ref === vendorRef).sort((a, b) => b.version - a.version)[0];
+      return sub ? runs.filter((r) => r.submission_id === sub.id).at(-1)?.id ?? null : null;
+    },
     async addDocument(d) {
       const row: DocumentRow = { ...d, id: randomUUID(), created_at: now(), doc_type: null, overall_confidence: null, extracted: null };
       docs.push(row);
@@ -95,6 +107,7 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
       return [...m.values()].map((e) => ({ check_id: e.check_id, title: e.title, runs: e.runs.size })).sort((a, b) => b.runs - a.runs);
     },
     async resetDemo({ vendors: seedVendors }) {
+      invites.length = 0;
       subs.length = 0; docs.length = 0; runs.length = 0; events.length = 0; checks.length = 0; messages.length = 0; actions.length = 0;
       vendors.length = 0; vendors.push(...seedVendors.map((v) => ({ ...v }))); runNo = 0;
     },
