@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { reminderMessage } from "@/lib/engine/message";
-import { effectiveStatus, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
+import { effectiveStatus, homeLine, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { StatusBadge } from "./ui";
 
-function Tile({ href, label, count, cls }: { href: string; label: string; count: number | null; cls: string }) {
+function Tile({ href, label, short, count, cls }: { href: string; label: string; short: string; count: number | null; cls: string }) {
   return (
-    <Link href={href} className={`rounded-xl border p-5 transition hover:shadow-md ${cls}`}>
-      <div className="text-sm font-medium">{label}</div>
-      <div className="mt-2 text-4xl font-semibold tabular-nums">{count ?? "–"}</div>
+    <Link href={href} className={`rounded-xl border p-3 transition hover:shadow-md sm:p-5 ${cls}`}>
+      <div className="text-xs font-medium sm:text-sm"><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span></div>
+      <div className="mt-1 text-3xl font-semibold tabular-nums sm:mt-2 sm:text-4xl">{count ?? "–"}</div>
     </Link>
   );
 }
@@ -30,13 +30,19 @@ export default function Home({ firstName }: { firstName: string }) {
   const todo = [...review.map((r: any) => ({ r, kind: "review" })), ...waits.map((r: any) => ({ r, kind: "wait" }))]
     .sort((a, b) => new Date(b.r.started_at).getTime() - new Date(a.r.started_at).getTime());
 
+  const staleWaits = waits.filter((r: any) => Date.now() - new Date(r.started_at).getTime() >= 3 * 864e5).length;
+  const line = latest ? homeLine(review.length, waits.length, staleWaits) : null;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{hello}{firstName ? `, ${firstName}` : ""}</h1>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Tile href="/vendors?filter=review" label="Needs your review" count={latest ? review.length : null} cls="border-orange-200 bg-orange-50 text-orange-900" />
-        <Tile href="/vendors?filter=PENDING_INFO" label="Waiting on vendor" count={latest ? waits.length : null} cls="border-amber-200 bg-amber-50 text-amber-900" />
-        <Tile href="/vendors?filter=APPROVED" label="Approved this week" count={latest ? approved.length : null} cls="border-emerald-200 bg-emerald-50 text-emerald-900" />
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">{hello}{firstName ? `, ${firstName}` : ""}</h1>
+        {line && <p className={`text-sm ${{ alert: "font-medium text-orange-700", warn: "font-medium text-amber-700", calm: "text-slate-500" }[line.tone]}`}>{line.text}</p>}
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <Tile href="/vendors?filter=review" label="Needs your review" short="Review" count={latest ? review.length : null} cls="border-orange-200 bg-orange-50 text-orange-900" />
+        <Tile href="/vendors?filter=PENDING_INFO" label="Waiting on vendor" short="Waiting" count={latest ? waits.length : null} cls="border-amber-200 bg-amber-50 text-amber-900" />
+        <Tile href="/vendors?filter=APPROVED" label="Approved this week" short="Approved" count={latest ? approved.length : null} cls="border-emerald-200 bg-emerald-50 text-emerald-900" />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">

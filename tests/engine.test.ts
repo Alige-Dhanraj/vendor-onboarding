@@ -326,3 +326,12 @@ test("rate limit: allows up to the limit, then blocks until the window passes", 
   assert.ok(allow("k1", 2, 1000, t + 1500), "allowed again after the window");
   assert.ok(allow("k2", 2, 1000, t), "other keys are not affected");
 });
+
+test("home line picks the most useful message", async () => {
+  const { homeLine } = await import("../lib/ui-labels");
+  assert.equal(homeLine(1, 5, 2).text, "1 vendor needs your review.");
+  assert.equal(homeLine(3, 0, 0).text, "3 vendors need your review.");
+  assert.match(homeLine(0, 4, 1).text, /^1 vendor has been waiting over 3 days/);
+  assert.equal(homeLine(0, 2, 0).tone, "calm");
+  assert.match(homeLine(0, 0, 0).text, /Nothing is stuck/);
+});

@@ -290,7 +290,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
           </ul>
           {!invite && (
             <div className="mt-3 text-sm">
-              <button type="button" className="text-indigo-700 hover:underline" onClick={() => setReqOpen((v) => !v)}>Don't have the files yet? Send the vendor a link</button>
+              <button type="button" className="-my-2 py-2 text-indigo-700 hover:underline" onClick={() => setReqOpen((v) => !v)}>Don't have the files yet? Send the vendor a link</button>
               {reqOpen && (
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -362,7 +362,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
             <Field label="Alternate mobile (optional)">{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
           </div>
           <details className="mt-3 text-sm">
-            <summary className="cursor-pointer font-medium text-indigo-700">Paste an email signature to fill the contact</summary>
+            <summary className="-my-2 cursor-pointer py-2 font-medium text-indigo-700">Paste an email signature to fill the contact</summary>
             <textarea className={`${inputCls} mt-2 min-h-[90px]`} placeholder={"Priya Raman\n+91 98400 12345\npriya@company.com"} value={signature} onChange={(e) => setSignature(e.target.value)} />
             <div className="mt-2 flex items-center gap-3">
               <button type="button" className={btnSecondary} onClick={fillFromSignature} disabled={!signature.trim()}>Fill contact</button>
@@ -371,7 +371,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
           </details>
 
           <details className="mt-5 text-sm">
-            <summary className="cursor-pointer font-medium text-slate-700">More (optional)</summary>
+            <summary className="-my-2 cursor-pointer py-2 font-medium text-slate-700">More (optional)</summary>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <Field label="Trade name">{input("trade_name", form.trade_name ?? "")}</Field>
               <Field label="Country">

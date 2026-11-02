@@ -29,11 +29,11 @@ export default function Vendors() {
       <input className={inputCls} placeholder="Search by name or GST number" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="flex flex-wrap gap-2">
         {CHIPS.map(([k, label]) => (
-          <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3.5 py-1.5 text-sm ${filter === k ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}>{label}</button>
+          <button key={k} onClick={() => setFilter(k)} className={`rounded-full px-3.5 py-2.5 text-sm sm:py-1.5 ${filter === k ? "bg-slate-900 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}>{label}</button>
         ))}
       </div>
 
-      <div className="text-right"><a href="/api/vendors/export" className="text-sm text-indigo-600 hover:underline">Download approved vendors (CSV)</a></div>
+      <div className="text-right"><a href="/api/vendors/export" className="inline-block py-2 text-sm text-indigo-600 hover:underline">Download approved vendors (CSV)</a></div>
 
       <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
         <summary className="cursor-pointer px-5 py-3 text-sm font-semibold text-slate-700">Why vendors get stuck</summary>

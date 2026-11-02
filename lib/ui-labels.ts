@@ -50,6 +50,15 @@ export const SLOT_LABEL: Record<string, string> = {
 export const listStatus = (r: { status: string; final_status?: string | null; internal_status?: string | null; inactive?: boolean }) =>
   r.inactive ? "INACTIVE" : effectiveStatus(r);
 
+/** One helpful line beside the greeting: the single most useful thing to know right now. */
+export function homeLine(review: number, waiting: number, stale: number): { text: string; tone: "alert" | "warn" | "calm" } {
+  const s = (n: number, one: string, many: string) => `${n} vendor${n === 1 ? "" : "s"} ${n === 1 ? one : many}`;
+  if (review > 0) return { text: `${s(review, "needs", "need")} your review.`, tone: "alert" };
+  if (stale > 0) return { text: `${s(stale, "has", "have")} been waiting over 3 days. Send a reminder.`, tone: "warn" };
+  if (waiting > 0) return { text: `${waiting} waiting on vendors. Nothing else is stuck.`, tone: "calm" };
+  return { text: "Nothing is stuck. You're all caught up.", tone: "calm" };
+}
+
 export const fmtMs = (ms?: number | null) => (ms == null ? "" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
 export const effectiveStatus = (r: { status: string; final_status?: string | null; internal_status?: string | null }) =>

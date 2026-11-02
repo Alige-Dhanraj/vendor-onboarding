@@ -112,7 +112,7 @@ export default function RunView({ id }: { id: string }) {
               {inactive && canDecide && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
             </div>
             <div className="mt-3 text-xs text-slate-500">
-              Checked in {fmtMs(run.duration_ms)} · <button className="underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
+              Checked in {fmtMs(run.duration_ms)} · <button className="-my-3 px-1 py-3 underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
             </div>
           </div>
           {showSteps && <Card className="p-5"><Stepper events={events} running={false} /></Card>}
@@ -132,7 +132,7 @@ export default function RunView({ id }: { id: string }) {
               {problems.map((c) => <Problem key={c.id} c={c} />)}
             </>
           ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">Nothing needs attention.</p>}
-          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or didn't apply · <button className="text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
+          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or didn't apply · <button className="-my-2 py-2 text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
           {showAll && <AllChecks checks={checks} />}
         </section>
       )}
@@ -200,7 +200,7 @@ function Problem({ c }: { c: CheckResult }) {
     <div className={`rounded-xl border p-4 ${tone}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="font-medium text-slate-900">{PLAIN[c.id] ?? c.title}</div>
-        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500 hover:bg-white">i</button>
+        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 text-xs text-slate-500 hover:bg-white">i</button>
       </div>
       <p className="mt-1 text-sm text-slate-700">{c.reason}</p>
       {c.sources.length > 1 && (
@@ -231,7 +231,7 @@ function AllChecks({ checks }: { checks: CheckResult[] }) {
               <div key={c.id}>
                 <button type="button" onClick={() => setOpen((p) => ({ ...p, [c.id]: !p[c.id] }))} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
                   <CheckBadge status={c.status} />
-                  <span className="flex-1 text-sm text-slate-800">{PLAIN[c.id] ?? c.title} <span className="mono ml-1 text-[11px] text-slate-400">{c.id}</span></span>
+                  <span className="flex-1 text-sm text-slate-800">{PLAIN[c.id] ?? c.title} <span className="mono ml-1 text-xs text-slate-400">{c.id}</span></span>
                   <span className="text-xs text-slate-400">{open[c.id] ? "−" : "+"}</span>
                 </button>
                 {open[c.id] && (
@@ -338,7 +338,7 @@ function ReviewPanel({ run, actions, onDone }: { run: any; actions: any[]; onDon
       ) : (
         <>
           <textarea className={`${inputCls} min-h-[76px]`} placeholder="Why? (at least 10 characters)" value={reason} onChange={(e) => setReason(e.target.value)} />
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <button className={btnPrimary} disabled={busy || !ok} onClick={() => act("APPROVE")}>Approve</button>
             <button className={btnSecondary} disabled={busy || !ok} onClick={() => act("REQUEST_INFO")}>Ask vendor for more</button>
             <button className={`${btnSecondary} text-rose-700`} disabled={busy || !ok} onClick={() => act("REJECT")}>Reject</button>
