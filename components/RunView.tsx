@@ -139,7 +139,7 @@ export default function RunView({ id }: { id: string }) {
 
       {!running && status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
       {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
-      {message && <MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} />}
+      {message && <MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} holding={status === "MANUAL_REVIEW"} />}
 
       {documents.length > 0 && (
         <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -293,17 +293,18 @@ function Documents({ documents, running }: { documents: any[]; running: boolean 
   );
 }
 
-function MessageCard({ message, email }: { message: any; email?: string }) {
+function MessageCard({ message, email, holding }: { message: any; email?: string; holding?: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <Card className="p-5">
-      <SectionTitle hint="Draft only, nothing is sent for you">Message to the vendor</SectionTitle>
+      <SectionTitle hint="Draft only, nothing is sent for you">{holding ? "Holding note (optional)" : "Message to the vendor"}</SectionTitle>
+      {holding && <p className="mb-3 text-sm text-slate-600">Decide first. If you need something from the vendor, use <b>Ask vendor for more</b> above, so they get a clear request. Send this note only if they are expecting a reply.</p>}
       <div className="rounded-lg border border-slate-200">
         <div className="border-b border-slate-100 px-4 py-2 text-sm"><span className="text-slate-500">Subject:</span> <span className="font-medium"><Rich text={message.subject} /></span></div>
         <div className="whitespace-pre-wrap px-4 py-3 text-sm leading-relaxed text-slate-800"><Rich text={message.body} /></div>
       </div>
-      <div className="mt-3 flex gap-2">
-        <a className={btnPrimary} href={mailtoLink(email, message)}>Send to vendor</a>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <a className={holding ? btnSecondary : btnPrimary} href={mailtoLink(email, message)}>{holding ? "Send acknowledgement" : "Send to vendor"}</a>
         <button type="button" className={btnSecondary} onClick={() => { navigator.clipboard.writeText(`Subject: ${plainText(message.subject)}\n\n${plainText(message.body)}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
           {copied ? "Copied" : "Copy"}
         </button>
