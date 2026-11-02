@@ -1,6 +1,6 @@
-// Template vendor message built only from failed checks.
-// The AI version (lib/ai/draft-message.ts) rewrites this into friendlier prose, but it receives
-// exactly the same list of findings, so it cannot invent new requirements.
+// Vendor messages are fixed templates built only from the verified findings.
+// Why not AI here: a vendor email must never invent a requirement, and it must be short.
+// **double asterisks** mark bold; the screen renders them, email links and copy strip them.
 
 import type { CheckResult, Decision, SubmissionForm } from "./types";
 
@@ -10,33 +10,44 @@ export interface DraftMessage {
   analyst_summary: string;
 }
 
-export function templateMessage(form: SubmissionForm, decision: Decision, results: CheckResult[]): DraftMessage | null {
-  const name = form.contact.name || "there";
+const lines = (rs: CheckResult[]) => rs.flatMap((r) => (r.vendor_fix ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
+const numbered = (ls: string[]) => ls.map((l, i) => `${i + 1}. ${l}`).join("\n");
+const firstName = (n: string) => (n || "").trim().split(/\s+/)[0] || "there";
+const FOOT = "Questions? Just reply to this email.";
+
+export function templateMessage(form: SubmissionForm, decision: Decision, results: CheckResult[]): DraftMessage {
+  const hi = `Hi ${firstName(form.contact.name)},`;
   const company = form.legal_name || "your company";
-  const fixes = results.filter((r) => r.status === "FAIL" && r.severity === "FIXABLE" && r.vendor_fix).map((r) => r.vendor_fix!);
+  const fixes = lines(results.filter((r) => r.status === "FAIL" && r.severity === "FIXABLE"));
+  const checks = decision.deciding_checks.join(", ");
 
-  if (decision.internal_status === "APPROVED") return null;
-
+  if (decision.internal_status === "APPROVED") {
+    return {
+      subject: `Registration approved: ${company}`,
+      body: `${hi}\n\nYour vendor registration is **approved**.\n\n1. Quote the **purchase order number** on every invoice.\n\n${FOOT}`,
+      analyst_summary: "Approved: all checks passed.",
+    };
+  }
   if (decision.internal_status === "REJECTED") {
+    const why = lines(results.filter((r) => r.status === "FAIL" && r.severity === "HARD_STOP"));
     return {
-      subject: `Vendor registration for ${company}: unable to proceed`,
-      body: `Dear ${name},\n\nThank you for submitting your vendor registration for ${company}. We are unable to proceed with this registration at this time.\n\nReason: ${decision.headline}\n\nIf you believe this is incorrect, please reply to this email and our procurement team will look into it.\n\nRegards,\nProcurement Team`,
-      analyst_summary: `Rejected by ${decision.deciding_checks.join(", ")}. ${decision.headline}`,
+      subject: `Registration not approved: ${company}`,
+      body: `${hi}\n\nWe can't approve your registration.\n\n${numbered(why.length ? why : ["We can't proceed with this registration."])}\n\n${FOOT}`,
+      analyst_summary: `Rejected (${checks || "reviewer"}). ${decision.headline}`,
     };
   }
-
   if (decision.internal_status === "MANUAL_REVIEW") {
-    const extra = fixes.length ? `\n\nIn the meantime, please also fix the following:\n${fixes.map((f, i) => `${i + 1}. ${f}`).join("\n")}` : "";
+    const extra = fixes.length ? `\n\nPlease also fix:\n${numbered(fixes)}` : "";
     return {
-      subject: `Vendor registration for ${company}: under review`,
-      body: `Dear ${name},\n\nThank you for your vendor registration for ${company}. Your submission is being reviewed by our procurement team, and we may contact you to confirm some details.${extra}\n\nRegards,\nProcurement Team`,
-      analyst_summary: `Manual review needed (${decision.deciding_checks.join(", ")}). ${decision.headline}`,
+      subject: `Registration under review: ${company}`,
+      body: `${hi}\n\nWe're reviewing your registration and may contact you.${extra}\n\n${FOOT}`,
+      analyst_summary: `Manual review (${checks}). ${decision.headline}`,
     };
   }
-
+  const list = fixes.length ? fixes : ["**Documents**: please resend clear copies"];
   return {
-    subject: `Vendor registration for ${company}: ${fixes.length} item${fixes.length === 1 ? "" : "s"} needed`,
-    body: `Dear ${name},\n\nThank you for your vendor registration for ${company}. To complete it, we need the following:\n\n${fixes.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n\nOnce you resubmit, we will re-check your registration straight away.\n\nRegards,\nProcurement Team`,
-    analyst_summary: `Pending vendor action on ${decision.deciding_checks.join(", ")}.`,
+    subject: `${company}: ${list.length} item${list.length === 1 ? "" : "s"} needed`,
+    body: `${hi}\n\nTo finish your registration, please fix:\n\n${numbered(list)}\n\nJust reply to this email with the fixes. Thank you!`,
+    analyst_summary: `Pending vendor action on ${checks}.`,
   };
 }

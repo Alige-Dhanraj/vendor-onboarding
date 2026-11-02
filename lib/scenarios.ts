@@ -56,15 +56,22 @@ const doc = (slot: DocSlot, file: string, doc_type: DocType, fields: ExtractedDo
   },
 });
 
-const gstCert = (ref: string, name: string, gstin: string, state: string) =>
-  doc("GST_CERTIFICATE", `${ref}-gst-certificate.pdf`, "GST_CERTIFICATE", { legal_name: name, gstin, registration_state: state });
+const ENTITY_TEXT: Record<string, string> = { PRIVATE_LIMITED: "Private Limited Company", LLP: "Limited Liability Partnership", PARTNERSHIP: "Partnership", PROPRIETORSHIP: "Proprietorship", CORPORATION: "Corporation" };
+const gstCert = (ref: string, name: string, gstin: string, state: string, f?: SubmissionForm) =>
+  doc("GST_CERTIFICATE", `${ref}-gst-certificate.pdf`, "GST_CERTIFICATE", {
+    legal_name: name, gstin, registration_state: state,
+    ...(f ? {
+      ...(f.trade_name ? { trade_name: f.trade_name } : {}),
+      constitution: ENTITY_TEXT[f.entity_type], address_street: f.address.street, address_city: f.address.city, address_pincode: f.address.postal_code,
+    } : {}),
+  });
 const panCard = (ref: string, name: string, pan: string, slot: DocSlot = "PAN_CARD") =>
   doc(slot, `${ref}-pan-card.png`, "PAN_CARD", { legal_name: name, pan });
 const cheque = (ref: string, holder: string, acct: string, ifsc: string, conf = 0.95) =>
   doc("BANK_PROOF", `${ref}-cancelled-cheque.png`, "BANK_PROOF", { account_holder: holder, account_number: acct, ifsc }, conf);
 
 const fullSet = (f: SubmissionForm, holderOnCheque?: string) => [
-  gstCert(f.vendor_ref, f.legal_name, f.tax.gstin!, f.address.state),
+  gstCert(f.vendor_ref, f.legal_name, f.tax.gstin!, f.address.state, f),
   panCard(f.vendor_ref, f.legal_name, f.tax.pan!),
   cheque(f.vendor_ref, holderOnCheque ?? f.bank.account_holder, f.bank.account_number, f.bank.ifsc!),
 ];

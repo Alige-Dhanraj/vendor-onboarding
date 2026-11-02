@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SCENARIOS } from "@/lib/scenarios";
 import { GST_STATE_CODES } from "@/lib/engine/ids";
+import { parseSignature } from "@/lib/engine/signature";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
 import { SLOT_LABEL } from "@/lib/ui-labels";
 import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } from "./ui";
@@ -25,6 +26,11 @@ const SLOTS: DocSlot[] = ["GST_CERTIFICATE", "PAN_CARD", "BANK_PROOF", "GST_DECL
 interface Doc { file: File; slot: DocSlot | ""; note?: string; reading?: boolean }
 
 const fmtSize = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`);
+
+function requiredSlots(f: SubmissionForm): DocSlot[] {
+  if (f.country === "US") return ["EIN_NOTICE", "BANK_PROOF"];
+  return [f.tax.gst_registered === false ? "GST_DECLARATION" : "GST_CERTIFICATE", "PAN_CARD", "BANK_PROOF"];
+}
 
 /** Shrinks large photos in the browser (no other website needed). PDFs and small files are left as they are. */
 async function compress(file: File): Promise<{ file: File; note?: string }> {
@@ -51,6 +57,7 @@ async function sampleFile(name: string): Promise<File> {
 export default function SubmitForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const demo = params.get("demo") === "1";
   const [form, setForm] = useState<SubmissionForm>(EMPTY);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
@@ -61,6 +68,8 @@ export default function SubmitForm() {
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [signature, setSignature] = useState("");
+  const [sigNote, setSigNote] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const scenario = useMemo(() => SCENARIOS.find((s) => s.id === scenarioId), [scenarioId]);
@@ -99,6 +108,27 @@ export default function SubmitForm() {
     setAiFilled((p) => { const n = new Set(p); n.delete(path); return n; });
   };
 
+  /** Put values into empty fields only, and highlight them as auto-filled. */
+  function fillEmpty(entries: [string, unknown][], always: string[] = []) {
+    const filled = new Set<string>();
+    setForm((prev) => {
+      const next: any = structuredClone(prev);
+      for (const [path, val] of entries) {
+        if (val === undefined || val === null || val === "") continue;
+        const keys = path.split(".");
+        let o = next;
+        for (const k of keys.slice(0, -1)) o = o[k];
+        const cur = o[keys.at(-1)!];
+        if (cur === "" || cur === undefined || always.includes(path)) {
+          o[keys.at(-1)!] = val;
+          if (!always.includes(path)) filled.add(path);
+        }
+      }
+      return next;
+    });
+    setAiFilled((p) => new Set([...p, ...filled]));
+  }
+
   /** New files: compress, let the AI sort them and fill the form. */
   async function addFiles(list: FileList | File[]) {
     setError(null);
@@ -115,36 +145,28 @@ export default function SubmitForm() {
       setDocs((p) => p.map((d) => {
         const r = json.docs.find((x: any) => x.name === d.file.name);
         if (!d.reading || !r) return d;
-        return { ...d, reading: false, slot: SLOTS.includes(r.doc_type) ? r.doc_type : "", note: [d.note, SLOTS.includes(r.doc_type) ? null : "not recognised, choose the type"].filter(Boolean).join(" · ") };
+        const known = SLOTS.includes(r.doc_type);
+        return { ...d, reading: false, slot: known ? r.doc_type : "", note: [d.note, known ? null : "not recognised, choose the type"].filter(Boolean).join(" · ") };
       }));
-      // Fill only fields that are still empty, and remember which ones the AI filled.
       const f = json.form ?? {};
-      const map: [string, unknown][] = [
-        ["legal_name", f.legal_name], ["country", f.country], ["address.state", f.state], ["tax.pan", f.pan], ["tax.gstin", f.gstin],
-        ["tax.gst_registered", f.gst_registered], ["tax.ein", f.ein], ["bank.account_holder", f.account_holder],
-        ["bank.account_number", f.account_number], ["bank.ifsc", f.ifsc],
-      ];
-      const filled = new Set<string>();
-      setForm((prev) => {
-        const next: any = structuredClone(prev);
-        for (const [path, val] of map) {
-          if (val === undefined || val === null || val === "") continue;
-          const keys = path.split(".");
-          let o = next;
-          for (const k of keys.slice(0, -1)) o = o[k];
-          const cur = o[keys.at(-1)!];
-          if (cur === "" || cur === undefined || path === "country" || path === "tax.gst_registered") {
-            o[keys.at(-1)!] = val;
-            if (path !== "country" && path !== "tax.gst_registered") filled.add(path);
-          }
-        }
-        return next;
-      });
-      setAiFilled((p) => new Set([...p, ...filled]));
+      fillEmpty([
+        ["legal_name", f.legal_name], ["trade_name", f.trade_name], ["entity_type", f.entity_type], ["country", f.country],
+        ["address.street", f.street], ["address.city", f.city], ["address.state", f.state], ["address.postal_code", f.pincode],
+        ["tax.pan", f.pan], ["tax.gstin", f.gstin], ["tax.gst_registered", f.gst_registered], ["tax.ein", f.ein],
+        ["bank.account_holder", f.account_holder], ["bank.account_number", f.account_number], ["bank.ifsc", f.ifsc],
+      ], ["country", "tax.gst_registered"]);
     } catch (err) {
       setError((err as Error).message);
       setDocs((p) => p.map((d) => (d.reading ? { ...d, reading: false } : d)));
     } finally { setReading(false); }
+  }
+
+  function fillFromSignature() {
+    const p = parseSignature(signature);
+    const got = Object.values(p).filter(Boolean).length;
+    if (!got) { setSigNote("Could not find a name, email or phone in that text."); return; }
+    fillEmpty([["contact.name", p.name], ["contact.email", p.email], ["contact.phone", p.phone], ["contact.alt_phone", p.alt_phone]]);
+    setSigNote(`Found ${got} detail${got > 1 ? "s" : ""}. Empty fields were filled; check them.`);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -172,142 +194,166 @@ export default function SubmitForm() {
     const cur = form.address.state;
     return cur && !list.includes(cur) ? [cur, ...list] : list;
   }, [form.address.state]);
+
   const need: [string, string | undefined][] = [
-    ["legal name", form.legal_name], ["entity type", form.entity_type], ["state", form.address.state], ["street", form.address.street],
-    ["city", form.address.city], [isUS ? "ZIP code" : "pincode", form.address.postal_code], ["contact name", form.contact.name],
+    ["legal name", form.legal_name], ["entity type", form.entity_type], ["street", form.address.street], ["city", form.address.city],
+    ["state", form.address.state], [isUS ? "ZIP code" : "pincode", form.address.postal_code], ["contact name", form.contact.name],
     ["contact email", form.contact.email], ["phone", form.contact.phone], ["account holder", form.bank.account_holder], ["account number", form.bank.account_number],
     ...(isUS
       ? ([["EIN", form.tax.ein], ["routing number", form.bank.routing_number]] as [string, string | undefined][])
       : ([["PAN", form.tax.pan], ["IFSC", form.bank.ifsc], ...(form.tax.gst_registered === false ? [] : [["GSTIN", form.tax.gstin]])] as [string, string | undefined][])),
   ];
   const missing = need.filter(([, v]) => !v || !String(v).trim()).map(([k]) => k);
+  const required = requiredSlots(form);
+  // Loaded test vendors may be incomplete on purpose (that is the edge case being shown).
+  const needDocs = scenarioId ? [] : required.filter((s) => !docs.some((d) => d.slot === s));
+  const blockedBy = [...needDocs.map((s) => SLOT_LABEL[s]), ...missing];
   const hl = (path: string) => (aiFilled.has(path) ? " ring-2 ring-indigo-200 bg-indigo-50/40" : "");
-  const inp = (path: string, extra = "") => `${inputCls}${hl(path)} ${extra}`;
+  const input = (path: string, value: string, o: { mono?: boolean; upper?: boolean; disabled?: boolean; placeholder?: string } = {}) => (
+    <input className={`${inputCls}${hl(path)} ${o.mono ? "mono" : ""}`} value={value} disabled={o.disabled} placeholder={o.placeholder}
+      onChange={(e) => set(path, o.upper ? e.target.value.toUpperCase() : e.target.value)} />
+  );
+  const gst = form.tax.gst_registered !== false;
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[1fr_360px]">
+    <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <div className="space-y-6">
-        {/* Step 1: documents */}
         <Card className="p-5">
-          <SectionTitle hint="The AI sorts them and fills the form for you">1 · Drop the vendor's documents</SectionTitle>
+          <SectionTitle>1 · Documents</SectionTitle>
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files); }}
             onClick={() => fileInput.current?.click()}
-            className={`cursor-pointer rounded-xl border-2 border-dashed px-6 py-8 text-center transition ${dragOver ? "border-indigo-400 bg-indigo-50" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}
+            className={`cursor-pointer rounded-xl border-2 border-dashed text-center transition ${docs.length ? "px-6 py-4" : "px-6 py-9"} ${dragOver ? "border-indigo-400 bg-indigo-50" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"}`}
           >
-            <div className="text-sm font-medium text-slate-800">Drag GST certificate, PAN card and cancelled cheque here</div>
-            <div className="mt-1 text-xs text-slate-500">or click to choose files · PDF, PNG or JPG · large photos are compressed automatically</div>
+            <div className="text-sm font-medium text-slate-800">{docs.length ? "Drop more files, or click to add" : "Drop all the vendor's documents here"}</div>
+            {!docs.length && <div className="mt-1 text-xs text-slate-500">or click to choose · PDF, PNG or JPG · big photos shrink automatically</div>}
             <input ref={fileInput} type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden"
               onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ""; }} />
           </div>
-          {docs.length > 0 && (
-            <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {docs.map((d, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-slate-800">{d.file.name}</div>
-                    <div className="text-xs text-slate-500">{fmtSize(d.file.size)}{d.note ? ` · ${d.note}` : ""}</div>
-                  </div>
-                  {d.reading ? <span className="text-xs text-indigo-600">AI is reading…</span> : (
-                    <select className={`${inputCls} w-56 py-1.5`} value={d.slot} onChange={(e) => setDocs((p) => p.map((x, j) => (j === i ? { ...x, slot: e.target.value as DocSlot } : x)))}>
-                      <option value="">Choose document type…</option>
-                      {SLOTS.map((s) => <option key={s} value={s}>{SLOT_LABEL[s]}</option>)}
-                    </select>
-                  )}
-                  <button type="button" className="text-xs text-slate-400 hover:text-rose-600" onClick={() => setDocs((p) => p.filter((_, j) => j !== i))}>Remove</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {aiFilled.size > 0 && <p className="mt-3 text-sm text-indigo-700">The AI filled {aiFilled.size} field{aiFilled.size > 1 ? "s" : ""} from the documents (highlighted). Check them, then add contact details.</p>}
+
+          <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
+            {docs.map((d, i) => (
+              <li key={i} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
+                <span className={d.slot ? "text-emerald-600" : "text-slate-300"}>{d.reading ? "…" : d.slot ? "✓" : "○"}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-slate-800">{d.slot ? SLOT_LABEL[d.slot] : d.file.name}</div>
+                  <div className="truncate text-xs text-slate-500">{d.slot ? `${d.file.name} · ` : ""}{fmtSize(d.file.size)}{d.note ? ` · ${d.note}` : ""}</div>
+                </div>
+                {d.reading ? <span className="text-xs text-indigo-600">Reading…</span> : (
+                  <select className={`${inputCls} w-52 py-1.5`} value={d.slot} onChange={(e) => setDocs((p) => p.map((x, j) => (j === i ? { ...x, slot: e.target.value as DocSlot } : x)))}>
+                    <option value="">Choose type…</option>
+                    {SLOTS.map((s) => <option key={s} value={s}>{SLOT_LABEL[s]}</option>)}
+                  </select>
+                )}
+                <button type="button" className="text-xs text-slate-400 hover:text-rose-600" onClick={() => setDocs((p) => p.filter((_, j) => j !== i))}>Remove</button>
+              </li>
+            ))}
+            {required.filter((s) => !docs.some((d) => d.slot === s)).map((s) => (
+              <li key={s} className="flex items-center gap-3 px-3 py-2.5 text-slate-400"><span>○</span><span className="flex-1">{SLOT_LABEL[s]}</span><span className="text-xs">still needed</span></li>
+            ))}
+          </ul>
+          {aiFilled.size > 0 && <p className="mt-3 text-sm text-indigo-700">Filled {aiFilled.size} field{aiFilled.size > 1 ? "s" : ""} from the documents (highlighted below). Please check them.</p>}
         </Card>
 
-        {/* Step 2: details */}
         <Card className="p-5">
-          <SectionTitle hint="Highlighted fields came from the documents">2 · Check the details</SectionTitle>
+          <SectionTitle>2 · Vendor details</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Legal name" required><input className={inp("legal_name")} value={form.legal_name} onChange={(e) => set("legal_name", e.target.value)} /></Field>
+            <Field label="Legal name" required>{input("legal_name", form.legal_name)}</Field>
             <Field label="Entity type" required>
-              <select className={inputCls} value={form.entity_type} onChange={(e) => set("entity_type", e.target.value)}>
+              <select className={`${inputCls}${hl("entity_type")}`} value={form.entity_type} onChange={(e) => set("entity_type", e.target.value)}>
                 <option value="">Select…</option>
                 <option value="PRIVATE_LIMITED">Private Limited</option><option value="LLP">LLP</option>
                 <option value="PARTNERSHIP">Partnership</option><option value="PROPRIETORSHIP">Proprietorship</option>
                 <option value="CORPORATION">Corporation (US)</option>
               </select>
             </Field>
-            {isUS ? (
-              <Field label="EIN" required><input className={inp("tax.ein", "mono")} value={form.tax.ein ?? ""} onChange={(e) => set("tax.ein", e.target.value)} /></Field>
-            ) : (<>
-              <Field label="PAN" required><input className={inp("tax.pan", "mono")} value={form.tax.pan ?? ""} onChange={(e) => set("tax.pan", e.target.value.toUpperCase())} /></Field>
-              <Field label="GSTIN" required={form.tax.gst_registered !== false}><input className={inp("tax.gstin", "mono")} value={form.tax.gstin ?? ""} onChange={(e) => set("tax.gstin", e.target.value.toUpperCase())} disabled={form.tax.gst_registered === false} placeholder={form.tax.gst_registered === false ? "Not GST-registered" : ""} /></Field>
-            </>)}
-            <Field label="Bank account holder" required><input className={inp("bank.account_holder")} value={form.bank.account_holder} onChange={(e) => set("bank.account_holder", e.target.value)} /></Field>
-            <Field label="Account number" required><input className={inp("bank.account_number", "mono")} value={form.bank.account_number} onChange={(e) => set("bank.account_number", e.target.value)} /></Field>
+            {isUS ? <Field label="EIN" required>{input("tax.ein", form.tax.ein ?? "", { mono: true })}</Field> : <>
+              <Field label="PAN" required>{input("tax.pan", form.tax.pan ?? "", { mono: true, upper: true })}</Field>
+              <Field label="GSTIN" required={gst}>{input("tax.gstin", form.tax.gstin ?? "", { mono: true, upper: true, disabled: !gst, placeholder: gst ? "" : "Not GST-registered" })}</Field>
+            </>}
+            <Field label="Bank account holder" required>{input("bank.account_holder", form.bank.account_holder)}</Field>
+            <Field label="Account number" required>{input("bank.account_number", form.bank.account_number, { mono: true })}</Field>
             {isUS
-              ? <Field label="Routing number" required><input className={inp("bank.routing_number", "mono")} value={form.bank.routing_number ?? ""} onChange={(e) => set("bank.routing_number", e.target.value)} /></Field>
-              : <Field label="IFSC" required><input className={inp("bank.ifsc", "mono")} value={form.bank.ifsc ?? ""} onChange={(e) => set("bank.ifsc", e.target.value.toUpperCase())} /></Field>}
-            <Field label="State" required>
-              {isUS
-                ? <input className={inp("address.state")} value={form.address.state} onChange={(e) => set("address.state", e.target.value)} />
-                : <select className={inp("address.state")} value={form.address.state} onChange={(e) => set("address.state", e.target.value)}>
-                    <option value="">Select state…</option>
-                    {stateOptions.map((st) => <option key={st} value={st}>{st}</option>)}
-                  </select>}
-            </Field>
+              ? <Field label="Routing number" required>{input("bank.routing_number", form.bank.routing_number ?? "", { mono: true })}</Field>
+              : <Field label="IFSC" required>{input("bank.ifsc", form.bank.ifsc ?? "", { mono: true, upper: true })}</Field>}
           </div>
-          <details className="mt-5 group" open={!!form.contact.email || !scenarioId}>
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">Address and contact</summary>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="Street" required><input className={inputCls} value={form.address.street} onChange={(e) => set("address.street", e.target.value)} /></Field></div>
-              <Field label="City" required><input className={inputCls} value={form.address.city} onChange={(e) => set("address.city", e.target.value)} /></Field>
-              <Field label={isUS ? "ZIP code" : "Pincode"} required><input className={inputCls} value={form.address.postal_code} onChange={(e) => set("address.postal_code", e.target.value)} /></Field>
-              <Field label="Contact name" required><input className={inputCls} value={form.contact.name} onChange={(e) => set("contact.name", e.target.value)} /></Field>
-              <Field label="Contact email" required><input className={inputCls} value={form.contact.email} onChange={(e) => set("contact.email", e.target.value)} /></Field>
-              <Field label="Phone" required><input className={inputCls} value={form.contact.phone} onChange={(e) => set("contact.phone", e.target.value)} /></Field>
-              <Field label="Alternate mobile (optional)"><input className={inputCls} value={form.contact.alt_phone ?? ""} onChange={(e) => set("contact.alt_phone", e.target.value)} /></Field>
-              <Field label="Country" required>
+
+          <h3 className="mb-3 mt-6 text-sm font-semibold text-slate-700">Address</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2"><Field label="Street" required>{input("address.street", form.address.street)}</Field></div>
+            <Field label="City" required>{input("address.city", form.address.city)}</Field>
+            <Field label="State" required>
+              {isUS ? input("address.state", form.address.state) : (
+                <select className={`${inputCls}${hl("address.state")}`} value={form.address.state} onChange={(e) => set("address.state", e.target.value)}>
+                  <option value="">Select state…</option>
+                  {stateOptions.map((st) => <option key={st} value={st}>{st}</option>)}
+                </select>
+              )}
+            </Field>
+            <Field label={isUS ? "ZIP code" : "Pincode"} required>{input("address.postal_code", form.address.postal_code)}</Field>
+          </div>
+
+          <h3 className="mb-3 mt-6 text-sm font-semibold text-slate-700">Contact</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Contact name" required>{input("contact.name", form.contact.name)}</Field>
+            <Field label="Email" required>{input("contact.email", form.contact.email)}</Field>
+            <Field label="Phone" required>{input("contact.phone", form.contact.phone)}</Field>
+            <Field label="Alternate mobile (optional)">{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
+          </div>
+          <details className="mt-3 text-sm">
+            <summary className="cursor-pointer font-medium text-indigo-700">Paste an email signature to fill the contact</summary>
+            <textarea className={`${inputCls} mt-2 min-h-[90px]`} placeholder={"Priya Raman\n+91 98400 12345\npriya@company.com"} value={signature} onChange={(e) => setSignature(e.target.value)} />
+            <div className="mt-2 flex items-center gap-3">
+              <button type="button" className={btnSecondary} onClick={fillFromSignature} disabled={!signature.trim()}>Fill contact</button>
+              {sigNote && <span className="text-xs text-slate-600">{sigNote}</span>}
+            </div>
+          </details>
+
+          <details className="mt-5 text-sm">
+            <summary className="cursor-pointer font-medium text-slate-700">More (optional)</summary>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <Field label="Trade name">{input("trade_name", form.trade_name ?? "")}</Field>
+              <Field label="Country">
                 <select className={inputCls} value={form.country} onChange={(e) => set("country", e.target.value)}><option value="IN">India</option><option value="US">United States</option></select>
               </Field>
               {!isUS && <Field label="GST registered?">
-                <select className={inputCls} value={form.tax.gst_registered === false ? "no" : "yes"} onChange={(e) => set("tax.gst_registered", e.target.value === "yes")}><option value="yes">Yes</option><option value="no">No (declaration instead)</option></select>
+                <select className={inputCls} value={gst ? "yes" : "no"} onChange={(e) => set("tax.gst_registered", e.target.value === "yes")}><option value="yes">Yes</option><option value="no">No (declaration instead)</option></select>
               </Field>}
-              <Field label="Trade name (optional)"><input className={inputCls} value={form.trade_name ?? ""} onChange={(e) => set("trade_name", e.target.value)} /></Field>
             </div>
           </details>
         </Card>
       </div>
 
-      <div className="space-y-6">
+      <div>
         <Card className="p-5 lg:sticky lg:top-20">
-          <SectionTitle>3 · Run the checks</SectionTitle>
-          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || docs.length === 0 || missing.length > 0}>
-            {reading ? "Reading documents…" : busy ? "Submitting…" : "Submit and run checks"}
+          <button type="submit" className={`${btnPrimary} w-full py-3 text-base`} disabled={busy || reading || docs.length === 0 || blockedBy.length > 0}>
+            {reading ? "Reading documents…" : busy ? "Starting…" : "Check vendor"}
           </button>
-          {docs.length === 0 && !reading && <p className="mt-2 text-xs text-slate-500">Add the documents first.</p>}
-          {docs.length > 0 && !reading && missing.length > 0 && <p className="mt-2 text-xs text-slate-500">Still needed (*): {missing.join(", ")}.</p>}
+          {blockedBy.length > 0 && !reading && <p className="mt-2 text-xs text-slate-500">Still needed: {blockedBy.join(", ")}.</p>}
           {error && <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
-          <p className="mt-3 text-xs text-slate-500">21 checks run on the server: nothing missing, IDs valid, everything consistent, no fraud signals.</p>
 
-          <div className="mt-6 border-t border-slate-100 pt-5">
-            <div className="mb-2 text-xs font-medium text-slate-600">Demo: load a test vendor</div>
-            <select className={inputCls} value={scenarioId} onChange={(e) => loadScenario(e.target.value)}>
-              <option value="">Choose a scenario…</option>
-              {GROUPS.map((g) => (
-                <optgroup key={g.key} label={g.label}>
-                  {SCENARIOS.filter((s) => s.group === g.key).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </optgroup>
-              ))}
-            </select>
-            {scenario && <p className="mt-2 text-xs text-slate-600">{version === 2 && <Pill tone="indigo">Version 2</Pill>} {scenario.story}</p>}
-            {scenario?.resubmission && (
-              <button type="button" className={`${btnSecondary} mt-2 w-full`} onClick={() => loadScenario(scenario.id, version === 1 ? 2 : 1, version === 1 ? scenario.form.vendor_ref : "")}>
-                {version === 1 ? "Load corrected resubmission" : "Back to first submission"}
-              </button>
-            )}
-            {vendorRef && <p className="mt-2 text-xs text-slate-500">New version for <span className="mono">{vendorRef}</span>.</p>}
-          </div>
+          {demo && (
+            <div className="mt-6 border-t border-slate-100 pt-5">
+              <div className="mb-2 text-xs font-medium text-slate-600">Test vendors</div>
+              <select className={inputCls} value={scenarioId} onChange={(e) => loadScenario(e.target.value)}>
+                <option value="">Choose…</option>
+                {GROUPS.map((g) => (
+                  <optgroup key={g.key} label={g.label}>
+                    {SCENARIOS.filter((s) => s.group === g.key).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              {scenario && <p className="mt-2 text-xs text-slate-600">{version === 2 && <Pill tone="indigo">Version 2</Pill>} {scenario.story}</p>}
+              {scenario?.resubmission && (
+                <button type="button" className={`${btnSecondary} mt-2 w-full`} onClick={() => loadScenario(scenario.id, version === 1 ? 2 : 1, version === 1 ? scenario.form.vendor_ref : "")}>
+                  {version === 1 ? "Load corrected resubmission" : "Back to first submission"}
+                </button>
+              )}
+            </div>
+          )}
+          {vendorRef && <p className="mt-3 text-xs text-slate-500">New version for <span className="mono">{vendorRef}</span>.</p>}
         </Card>
       </div>
     </form>

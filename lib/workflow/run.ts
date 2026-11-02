@@ -2,7 +2,7 @@
 // live run view can show progress, and storing every check result as the audit log.
 //
 //   INTAKE -> READ_DOCUMENTS (AI) -> COMPLETE -> VALID -> CONSISTENT (AI names) -> CREDIBLE
-//   -> DECIDE (rules) -> COMMUNICATE (AI draft) -> RECORD
+//   -> DECIDE (rules) -> COMMUNICATE (template message) -> RECORD
 //
 // AI reads and writes; rules decide.
 
@@ -16,7 +16,6 @@ import { decide } from "../engine/policy";
 import type { CheckContext, CheckResult, ExtractedDoc, Layer, NameJudgement } from "../engine/types";
 import { aiEnabled, aiModel } from "../ai/openai";
 import { compareNames } from "../ai/compare-names";
-import { draftMessage } from "../ai/draft-message";
 import { readDocument } from "../ai/read-document";
 import { scenarioById } from "../scenarios";
 import type { DocumentRow, Stage, Store } from "../store/types";
@@ -149,11 +148,9 @@ export async function executeRun(store: Store, runId: string, opts: RunOptions =
     });
 
     await stage("COMMUNICATE", async () => {
-      const template = templateMessage(sub.form_data, decision, all);
-      if (!template) return { value: null, detail: "No vendor message needed" };
-      const msg = await draftMessage(sub.form_data, decision, all, template);
-      await store.saveMessage({ run_id: runId, subject: msg.subject, body: msg.body, analyst_summary: msg.analyst_summary, generated_by: msg.generated_by });
-      return { value: null, detail: `Draft ready (${msg.generated_by === "openai" ? "AI-written" : "template"}), waiting for a person to send` };
+      const msg = templateMessage(sub.form_data, decision, all);
+      await store.saveMessage({ run_id: runId, subject: msg.subject, body: msg.body, analyst_summary: msg.analyst_summary, generated_by: "template" });
+      return { value: null, detail: decision.internal_status === "APPROVED" ? "Approval note ready for a person to send" : "Message ready for a person to send" };
     });
 
     await stage("RECORD", async () => {

@@ -137,16 +137,16 @@ test("every flagged check carries full evidence (traceability)", () => {
 test("vendor message lists exactly the fixable items, nothing else", () => {
   const s = SCENARIOS.find((x) => x.id === "2-wrong-document")!;
   const { results, message } = evaluate(ctxFor(s));
-  assert.ok(message);
-  const fixes = results.filter((r) => r.status === "FAIL" && r.severity === "FIXABLE").map((r) => r.vendor_fix!);
-  for (const f of fixes) assert.ok(message!.body.includes(f));
-  assert.match(message!.subject, new RegExp(`${fixes.length} item`));
+  const fixes = results.filter((r) => r.status === "FAIL" && r.severity === "FIXABLE").flatMap((r) => r.vendor_fix!.split("\n"));
+  for (const f of fixes) assert.ok(message.body.includes(f));
+  assert.match(message.subject, new RegExp(`${fixes.length} item`));
 });
 
-test("approved vendors get no message; rejected get a reason", () => {
-  assert.equal(evaluate(ctxFor(SCENARIOS[0])).message, null);
+test("approved vendors get a short approval note; rejected get a vendor-safe reason", () => {
+  assert.match(evaluate(ctxFor(SCENARIOS[0])).message.body, /approved/);
   const rej = evaluate(ctxFor(SCENARIOS.find((x) => x.id === "3a-duplicate")!));
-  assert.match(rej.message!.body, /already registered/);
+  assert.match(rej.message.body, /already registered/);
+  assert.ok(!rej.message.body.includes("VM-001"), "never names another vendor");
 });
 
 test("blurry document: dependent checks are unverified, never passed", () => {
@@ -156,11 +156,10 @@ test("blurry document: dependent checks are unverified, never passed", () => {
   assert.equal(results.find((r) => r.id === "K7")!.status, "UNVERIFIED");
 });
 
-test("the plain-English catalogue lists exactly the checks the engine runs", async () => {
-  const { CATALOGUE } = await import("../lib/engine/catalogue");
+test("every check has a plain-language name", async () => {
+  const { PLAIN } = await import("../lib/engine/plain");
   const { runChecks } = await import("../lib/engine/checks");
-  const ids = runChecks(ctxFor(SCENARIOS[0])).map((r) => r.id);
-  assert.deepEqual(CATALOGUE.map((c) => c.id), ids);
+  for (const r of runChecks(ctxFor(SCENARIOS[0]))) assert.ok(PLAIN[r.id], `${r.id} needs a plain name`);
 });
 
 test("O/0 misreads are corrected only where the ID format fixes the character type", async () => {
@@ -169,4 +168,32 @@ test("O/0 misreads are corrected only where the ID format fixes the character ty
   assert.equal(fixFixedPositions("AABCK482IL", "pan"), "AABCK4821L");
   assert.equal(fixFixedPositions("33AABCK4821L1ZM", "gstin"), "33AABCK4821L1ZM");
   assert.equal(fixFixedPositions("DEMO0VATVAX", "ifsc"), "DEMO0VATVAX"); // branch part (X) left alone
+});
+
+test("email signature parser fills name, email and phones", async () => {
+  const { parseSignature } = await import("../lib/engine/signature");
+  const p = parseSignature("Thanks,\nPriya Raman\nAccounts Manager\nKaveri Precision Components Pvt Ltd\nM: +91 98400 12345 | Alt: 044 2345 6789\npriya@kaveriprecision.example");
+  assert.equal(p.name, "Priya Raman");
+  assert.equal(p.email, "priya@kaveriprecision.example");
+  assert.equal(p.phone, "+91 98400 12345");
+  assert.equal(p.alt_phone, "044 2345 6789");
+  assert.deepEqual(parseSignature("hello"), {});
+});
+
+test("GST certificate constitution maps to entity types", async () => {
+  const { mapEntityType } = await import("../lib/engine/entity");
+  assert.equal(mapEntityType("Private Limited Company"), "PRIVATE_LIMITED");
+  assert.equal(mapEntityType("Limited Liability Partnership (LLP)"), "LLP");
+  assert.equal(mapEntityType("Partnership Firm"), "PARTNERSHIP");
+  assert.equal(mapEntityType("Proprietorship"), "PROPRIETORSHIP");
+  assert.equal(mapEntityType("Public Limited"), null);
+  assert.equal(mapEntityType(""), null);
+});
+
+test("vendor messages are short numbered lists with bold document names", () => {
+  const s = SCENARIOS.find((x) => x.id === "2-wrong-document")!;
+  const { message } = evaluate(ctxFor(s));
+  assert.match(message.body, /1\. \*\*GST certificate\*\*: missing/);
+  assert.match(message.body, /2\. \*\*Cancelled cheque \/ bank letter\*\*: wrong file/);
+  assert.ok(message.body.length < 400, "short");
 });

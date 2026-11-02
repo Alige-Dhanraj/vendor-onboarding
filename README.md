@@ -6,8 +6,8 @@ message back to the vendor for anything not approved.
 
 **Design line: AI reads and writes, rules decide.**
 
-- The AI (OpenAI Responses API, strict JSON output) reads and classifies documents, judges whether two names are
-  the same entity when rules can't tell, and drafts the vendor message from verified findings only.
+- The AI (OpenAI Responses API, strict JSON output) reads and classifies documents, and judges whether two names are
+  the same entity when rules can't tell. Vendor messages are fixed short templates built from the verified findings: an email must never invent a requirement.
 - 21 deterministic checks in four layers (Complete, Valid, Consistent, Credible) produce the evidence.
 - A fixed policy turns check results into the outcome. No AI score is involved.
 - Supabase stores every run, stage event, check result and reviewer action: the audit log.
@@ -23,7 +23,7 @@ message back to the vendor for anything not approved.
 | Consistent | PAN inside GSTIN, PAN holder type, GSTIN state, legal name and bank holder across documents |
 | Credible | Duplicate vendor, bank account reuse, blocklist, GST status (TEST REGISTRY) |
 | Decide | Hard stop → Rejected; review signal → Pending + review flag; fixable → Pending; else Approved |
-| Communicate | Draft vendor message (AI-written from findings, template fallback). Draft only, never auto-sent |
+| Communicate | Short vendor message from a template (numbered list, bold document names). Draft only, never auto-sent |
 | Record | Audit log saved; approved vendors added to the vendor master |
 
 Every flagged check answers: **what was checked, where each value came from, which rule applied, why, and what next**.
@@ -86,7 +86,7 @@ service-role key. Re-running `seed.sql` resets the demo data.
    `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, `DEMO_PASSWORD`, `DEMO_PACING_MS=400`.
 3. Deploy. The run endpoint allows up to 300 s (the Hobby maximum); a run normally takes well under a minute.
 
-## Demo scenarios (sample picker on the home page)
+## Test vendors (open `/new?demo=1`, or Settings > Open test vendors)
 
 | # | Scenario | Expected |
 | --- | --- | --- |
@@ -106,10 +106,10 @@ Submitting the happy path twice shows memory across runs: the second time is cau
 ## Project layout
 
 ```
-app/              pages (submit, runs/[id], dashboard, review, rules) and API routes
-components/       SubmitForm, RunView (live view + evidence + reviewer), Dashboard
+app/              pages (home, vendors, new, runs/[id], settings, login) and API routes
+components/       SubmitForm, RunView (result + problems + reviewer), Home, Vendors, HelpPanel
 lib/engine/       checks, ID rules, name rules, policy, template message (pure, unit-tested)
-lib/ai/           read-document, compare-names, draft-message (OpenAI Responses API)
+lib/ai/           read-document, compare-names (OpenAI Responses API)
 lib/workflow/     intake, orchestrator (writes run events), reviewer actions
 lib/store/        Store interface, Supabase and in-memory implementations
 supabase/         schema migration and generated seed

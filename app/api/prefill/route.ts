@@ -8,6 +8,7 @@ import { readCacheKey, sha256 } from "@/lib/workflow/run";
 import { ALLOWED_MIME, MAX_FILE_BYTES, SLOTS } from "@/lib/workflow/intake";
 import { SCENARIOS } from "@/lib/scenarios";
 import { fixFixedPositions, gstinPan, gstinState } from "@/lib/engine/ids";
+import { mapEntityType } from "@/lib/engine/entity";
 import type { DocSlot, ExtractedDoc } from "@/lib/engine/types";
 
 export const runtime = "nodejs";
@@ -43,6 +44,11 @@ export async function POST(req: Request) {
     const pan = get("PAN_CARD", "pan") ?? (gstin ? gstinPan(gstin) : undefined);
     const ein = get("EIN_NOTICE", "ein");
     const form = {
+      entity_type: mapEntityType(get("GST_CERTIFICATE", "constitution")) ?? undefined,
+      trade_name: (() => { const t = get("GST_CERTIFICATE", "trade_name")?.trim(); return t && !/^(-|nil|n\/a|none)$/i.test(t) ? t : undefined; })(),
+      street: get("GST_CERTIFICATE", "address_street"),
+      city: get("GST_CERTIFICATE", "address_city"),
+      pincode: get("GST_CERTIFICATE", "address_pincode")?.replace(/\D/g, "") || undefined,
       legal_name: get("GST_CERTIFICATE", "legal_name") ?? get("EIN_NOTICE", "legal_name") ?? get("PAN_CARD", "legal_name"),
       country: ein ? "US" : "IN",
       state: get("GST_CERTIFICATE", "registration_state") ?? (gstin ? gstinState(gstin) : undefined),

@@ -1,8 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // The engine runs on the server only (node:crypto); keep it out of client bundles.
   serverExternalPackages: [],
+  async redirects() {
+    return [
+      { source: "/dashboard", destination: "/vendors", permanent: false },
+      { source: "/review", destination: "/vendors?filter=review", permanent: false },
+      { source: "/rules", destination: "/", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -3,23 +3,36 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CheckResult } from "@/lib/engine/types";
-import { LAYER_LABEL, SEVERITY_LABEL, SLOT_LABEL, STAGES, effectiveStatus, fmtMs } from "@/lib/ui-labels";
-import { SCENARIOS } from "@/lib/scenarios";
+import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtMs, mailtoLink, plainText } from "@/lib/ui-labels";
 import { Card, CheckBadge, Pill, SectionTitle, StatusBadge, btnPrimary, btnSecondary, inputCls } from "./ui";
 
-type Bundle = any; // shape of GET /api/runs/:id (RunBundle with signed document URLs)
+type Bundle = any; // shape of GET /api/runs/:id
+
+const Rich = ({ text }: { text: string }) => <>{text.split("**").map((p, i) => (i % 2 ? <b key={i}>{p}</b> : <span key={i}>{p}</span>))}</>;
+
+const NEXT_STEP: Record<string, string> = {
+  APPROVED: "Send the vendor a short approval note.",
+  PENDING_INFO: "Send the vendor the list below so they can fix it.",
+  REJECTED: "Send the vendor a short notice.",
+  FAILED: "The check could not finish. Please review this vendor by hand.",
+};
 
 export default function RunView({ id }: { id: string }) {
   const [data, setData] = useState<Bundle | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const started = useRef(false);
   const [role, setRole] = useState<string | null>(null);
+  const [showSteps, setShowSteps] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const started = useRef(false);
+  const sawRunning = useRef(false);
+
   useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((j) => setRole(j.role ?? null)).catch(() => {}); }, []);
 
   async function load() {
     const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
     const json = await res.json();
-    if (!res.ok) { setError(json.error ?? "Could not load run"); return null; }
+    if (!res.ok) { setError(json.error ?? "Could not load this vendor"); return null; }
     setData(json);
     return json;
   }
@@ -41,9 +54,7 @@ export default function RunView({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Result popup: only when this page watched the run finish (not when reopening an old run).
-  const [toast, setToast] = useState<string | null>(null);
-  const sawRunning = useRef(false);
+  // Result popup: only when this page watched the check finish (not when reopening an old one).
   useEffect(() => {
     if (!data) return;
     if (data.run.status === "RUNNING") { sawRunning.current = true; return; }
@@ -54,50 +65,95 @@ export default function RunView({ id }: { id: string }) {
     return () => clearTimeout(t);
   }, [data]);
 
-  if (error) return <Card className="p-6 text-sm text-rose-700">{error}</Card>;
-  if (!data) return <div className="text-sm text-slate-500">Loading run…</div>;
+  if (error) return <Card className="mx-auto max-w-3xl p-6 text-sm text-rose-700">{error}</Card>;
+  if (!data) return <div className="mx-auto max-w-3xl space-y-4"><div className="h-9 w-72 animate-pulse rounded bg-slate-200" /><div className="h-40 animate-pulse rounded-xl bg-slate-100" /></div>;
 
   const { run, submission, events, checks, documents, message, reviewer_actions } = data;
   const form = submission.form_data;
   const status = effectiveStatus(run);
   const running = run.status === "RUNNING";
-  const scenario = submission.scenario_id ? SCENARIOS.find((s) => s.id === submission.scenario_id) : undefined;
+  const rank = (c: CheckResult) => c.status === "FAIL" ? (c.severity === "HARD_STOP" ? 0 : c.severity === "REVIEW" ? 1 : 2) : c.status === "UNVERIFIED" ? 3 : 4;
+  const problems: CheckResult[] = checks.filter((c: CheckResult) => ["FAIL", "UNVERIFIED", "WARN"].includes(c.status)).sort((a: CheckResult, b: CheckResult) => rank(a) - rank(b));
+  const passed = checks.length - problems.length;
+  const canDecide = role === "REVIEWER" || role === "ADMIN";
+  const needsDecision = !running && run.review_flag && !run.review_resolved;
+  const email = form.contact?.email;
+
+  const nextStep = status === "MANUAL_REVIEW" ? (canDecide ? "Check the problem below, then decide." : "A reviewer will decide this one.") : NEXT_STEP[status];
+  const resubmit = `/new?vendor_ref=${encodeURIComponent(submission.vendor_ref)}${submission.scenario_id ? `&scenario=${submission.scenario_id}&v=2&demo=1` : ""}`;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-5">
       {toast && <ResultToast status={toast} />}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Run VEN-{String(run.run_number).padStart(4, "0")} · version {submission.version}</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{form.legal_name || "Unnamed vendor"}</h1>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Pill tone={run.ai_mode === "openai" ? "indigo" : "amber"}>{run.ai_mode === "openai" ? "Documents read by OpenAI" : "Offline mode: readings from test fixtures"}</Pill>
-            {scenario && <Pill>Scenario: {scenario.label}</Pill>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className={btnSecondary}>Dashboard</Link>
-          <Link href="/" className={btnPrimary}>New submission</Link>
-        </div>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">{form.legal_name || "Unnamed vendor"}</h1>
+        <div className="mt-1 text-sm text-slate-500">{[form.contact?.name, email].filter(Boolean).join(" · ")}</div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        <Card className="h-fit p-5">
-          <SectionTitle hint={run.duration_ms ? `total ${fmtMs(run.duration_ms)}` : running ? "running…" : ""}>Live run</SectionTitle>
-          <Stepper events={events} running={running} />
+      {running ? (
+        <Card className="p-5">
+          <SectionTitle>Checking…</SectionTitle>
+          <Stepper events={events} running />
         </Card>
+      ) : (
+        <>
+          <div className={`rounded-xl border p-5 ${{ APPROVED: "border-emerald-200 bg-emerald-50/60", PENDING_INFO: "border-amber-200 bg-amber-50/60", MANUAL_REVIEW: "border-orange-200 bg-orange-50/60", REJECTED: "border-rose-200 bg-rose-50/60", FAILED: "border-rose-200 bg-rose-50/60" }[status as string] ?? ""}`}>
+            <StatusBadge status={status} size="lg" />
+            <p className="mt-3 text-base font-medium text-slate-900">{run.headline}</p>
+            <p className="mt-1 text-sm text-slate-600">{nextStep}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {status === "APPROVED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
+              {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send to vendor</a>}
+              {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
+              {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
+              {status === "PENDING_INFO" && <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link>}
+              {status === "APPROVED" && <Link className={btnSecondary} href="/new">Next vendor</Link>}
+            </div>
+            <div className="mt-3 text-xs text-slate-500">
+              Checked in {fmtMs(run.duration_ms)} · <button className="underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
+            </div>
+          </div>
+          {showSteps && <Card className="p-5"><Stepper events={events} running={false} /></Card>}
+        </>
+      )}
 
-        <div className="space-y-6">
-          <OutcomeBanner run={run} status={status} running={running} checks={checks} message={message} email={form.contact?.email} vendorRef={submission.vendor_ref} version={submission.version} scenario={scenario} />
-          {!running && run.review_flag && (role === "REVIEWER" || role === "ADMIN" || reviewer_actions.length > 0
-            ? <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />
-            : role ? <Card className="border-orange-200 p-5 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
-          {checks.length > 0 && <Checks checks={checks} />}
-        </div>
-      </div>
+      {needsDecision && (canDecide
+        ? <div id="decide" className="scroll-mt-24"><ReviewPanel run={run} actions={reviewer_actions} onDone={load} /></div>
+        : role ? <Card className="border-orange-200 p-4 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
+      {!running && run.review_flag && run.review_resolved && reviewer_actions.length > 0 && <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />}
 
-      {documents.length > 0 && <Documents documents={documents} running={running} />}
-      {message && <Message message={message} email={form.contact?.email} />}
+      {!running && checks.length > 0 && (
+        <section className="space-y-3">
+          {problems.length > 0 ? (
+            <>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What needs attention</h2>
+              {problems.map((c) => <Problem key={c.id} c={c} />)}
+            </>
+          ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">Nothing needs attention.</p>}
+          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or didn't apply · <button className="text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
+          {showAll && <AllChecks checks={checks} />}
+        </section>
+      )}
+
+      {message && <MessageCard message={message} email={email} />}
+
+      {documents.length > 0 && (
+        <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">Documents ({documents.length})</summary>
+          <div className="space-y-3 px-5 pb-5"><Documents documents={documents} running={running} /></div>
+        </details>
+      )}
+
+      {!running && (
+        <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">History</summary>
+          <ul className="space-y-2 px-5 pb-5 text-sm text-slate-600">
+            <li>Version {submission.version} submitted · {new Date(submission.created_at).toLocaleString()}</li>
+            <li>Checked by VendorGate in {fmtMs(run.duration_ms)}</li>
+            {reviewer_actions.map((a: any) => <li key={a.id}>{a.action.replace("_", " ").toLowerCase()} by {a.reviewer} · {new Date(a.created_at).toLocaleString()}: “{a.reason}”</li>)}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
@@ -111,9 +167,7 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
       {STAGES.map((s, i) => {
         const e = latest.get(s.key);
         const state = e?.state ?? (running ? "WAITING" : "SKIPPED");
-        const dot = {
-          RUNNING: "bg-indigo-500 pulse", DONE: "bg-emerald-500", FLAGGED: "bg-amber-500", FAILED: "bg-rose-500", WAITING: "bg-slate-200", SKIPPED: "bg-slate-200",
-        }[state as string] ?? "bg-slate-200";
+        const dot = ({ RUNNING: "bg-indigo-500 pulse", DONE: "bg-emerald-500", FLAGGED: "bg-amber-500", FAILED: "bg-rose-500", WAITING: "bg-slate-200", SKIPPED: "bg-slate-200" } as Record<string, string>)[state] ?? "bg-slate-200";
         return (
           <li key={s.key} className="relative flex gap-3 pb-3">
             {i < STAGES.length - 1 && <span className="absolute left-[7px] top-5 h-full w-px bg-slate-200" />}
@@ -133,163 +187,123 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
   );
 }
 
-function mailto(email: string | undefined, m: any) {
-  return `mailto:${encodeURIComponent(email ?? "")}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`;
-}
-
-const NEXT_STEP: Record<string, string> = {
-  APPROVED: "Nothing to do. The vendor is verified and added to the vendor master.",
-  PENDING_INFO: "Send the drafted message so the vendor can fix the items below.",
-  MANUAL_REVIEW: "A person should look at the evidence and decide.",
-  REJECTED: "Send the drafted notice. A hard-stop rule cannot be overridden here.",
-  FAILED: "The run could not finish. Please review the submission manually.",
-};
-
-function OutcomeBanner({ run, status, running, checks, message, email, vendorRef, version, scenario }: { run: any; status: string; running: boolean; checks: CheckResult[]; message: any; email?: string; vendorRef: string; version: number; scenario?: any }) {
-  if (running) {
-    return <Card className="p-5"><div className="flex items-center gap-3 text-sm text-slate-600"><span className="h-2.5 w-2.5 rounded-full bg-indigo-500 pulse" />Processing… each stage appears on the left as it finishes.</div></Card>;
-  }
-  const tone = { APPROVED: "border-emerald-200 bg-emerald-50/60", PENDING_INFO: "border-amber-200 bg-amber-50/60", MANUAL_REVIEW: "border-orange-200 bg-orange-50/60", REJECTED: "border-rose-200 bg-rose-50/60", FAILED: "border-rose-200 bg-rose-50/60" }[status] ?? "";
-  const flagged = checks.filter((c) => c.status === "FAIL" && !(run.headline ?? "").includes(c.reason));
-  const counts = ["PASS", "FAIL", "WARN", "UNVERIFIED"].map((s) => [s, checks.filter((c) => c.status === s).length] as const);
+function Problem({ c }: { c: CheckResult }) {
+  const [open, setOpen] = useState(false);
+  const tone = c.status === "FAIL"
+    ? (c.severity === "HARD_STOP" ? "border-rose-200 bg-rose-50/50" : c.severity === "REVIEW" ? "border-orange-200 bg-orange-50/50" : "border-amber-200 bg-amber-50/50")
+    : "border-slate-200 bg-slate-50";
   return (
-    <div className={`rounded-xl border p-5 ${tone}`}>
-      <div className="flex flex-wrap items-center gap-3">
-        <StatusBadge status={status} size="lg" />
-        <span className="text-xs text-slate-500">Output: <b className="text-slate-700">{run.final_status ? (run.final_status === "PENDING_INFO" ? "PENDING" : run.final_status) : run.outcome}</b>{run.review_flag ? " · review flag" : ""}</span>
-        <span className="ml-auto text-xs text-slate-500">{counts.map(([s, n]) => `${n} ${s.toLowerCase()}`).join(" · ")}</span>
+    <div className={`rounded-xl border p-4 ${tone}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="font-medium text-slate-900">{PLAIN[c.id] ?? c.title}</div>
+        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-slate-300 text-[11px] text-slate-500 hover:bg-white">i</button>
       </div>
-      <p className="mt-3 text-[15px] font-medium text-slate-900">{run.headline}</p>
-      <p className="mt-1 text-sm text-slate-600"><b>Next step:</b> {run.final_status ? "Decided by a reviewer; see the decision below." : NEXT_STEP[status]}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {message && (status === "PENDING_INFO" || status === "REJECTED" || run.final_status) && <a className={btnPrimary} href={mailto(email, message)}>Send to vendor</a>}
-        {status === "MANUAL_REVIEW" && !run.final_status && <a className={btnPrimary} href="#review">Review and decide</a>}
-        {status === "PENDING_INFO" && <Link className={btnSecondary} href={`/?vendor_ref=${encodeURIComponent(vendorRef)}${scenario?.resubmission ? `&scenario=${scenario.id}&v=2` : ""}`}>Resubmit as version {version + 1}</Link>}
-        {status === "APPROVED" && <Link className={btnSecondary} href="/">Next vendor</Link>}
-      </div>
-      {flagged.length > 0 && (
-        <ul className="mt-3 space-y-1 text-sm text-slate-700">
-          {flagged.map((c) => <li key={c.id}><span className="mono text-xs text-slate-500">{c.id}</span> <b>{SEVERITY_LABEL[c.severity ?? ""]}</b>: {c.reason}</li>)}
-        </ul>
+      <p className="mt-1 text-sm text-slate-700">{c.reason}</p>
+      {c.sources.length > 1 && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {c.sources.map((s, i) => (
+            <div key={i} className="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
+              <div className="text-xs text-slate-500">{s.label}</div>
+              <div className="mono break-all text-sm text-slate-900">{s.value}</div>
+            </div>
+          ))}
+        </div>
       )}
+      {c.next_action && <p className="mt-3 text-sm text-slate-800"><b>Next:</b> {c.next_action}</p>}
+      {open && <div className="mt-3 space-y-1 border-t border-slate-200 pt-3 text-xs text-slate-600"><div><b>What we compared:</b> {c.checked}</div><div><b>Rule:</b> {c.rule}</div></div>}
     </div>
   );
 }
 
-function Checks({ checks }: { checks: CheckResult[] }) {
-  const [showAll, setShowAll] = useState(false);
-  const quiet = (c: CheckResult) => c.status === "PASS" || c.status === "SKIPPED";
-  const passed = checks.filter(quiet).length;
-  const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(checks.filter((c) => c.status !== "PASS" && c.status !== "SKIPPED").map((c) => [c.id, true])));
-  const layers = ["COMPLETE", "VALID", "CONSISTENT", "CREDIBLE"];
+function AllChecks({ checks }: { checks: CheckResult[] }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
-    <Card className="p-5">
-      <SectionTitle hint={<button type="button" className="text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show only problems" : `Show all ${checks.length} checks`}</button>}>Checks and evidence</SectionTitle>
-      {!showAll && <p className="mb-4 text-sm text-slate-600">✓ {passed} check{passed === 1 ? "" : "s"} passed or not applicable. {checks.length - passed ? `${checks.length - passed} need${checks.length - passed === 1 ? "s" : ""} attention:` : "Nothing needs attention."}</p>}
-      <div className="space-y-5">
-        {layers.filter((l) => showAll || checks.some((c) => c.layer === l && !quiet(c))).map((l) => (
-          <div key={l}>
-            <div className="mb-2 text-xs font-semibold text-slate-700">{LAYER_LABEL[l]}</div>
-            <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-              {checks.filter((c) => c.layer === l && (showAll || !quiet(c))).map((c) => (
-                <div key={c.id}>
-                  <button type="button" onClick={() => setOpen((p) => ({ ...p, [c.id]: !p[c.id] }))} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
-                    <CheckBadge status={c.status} />
-                    <span className="flex-1 text-sm text-slate-800">{c.title} <span className="mono ml-1 text-[11px] text-slate-400">{c.id}</span></span>
-                    {c.severity && c.status !== "PASS" && <span className="text-xs text-slate-500">{SEVERITY_LABEL[c.severity]}</span>}
-                    <span className="text-xs text-slate-400">{open[c.id] ? "−" : "+"}</span>
-                  </button>
-                  {open[c.id] && <Evidence c={c} />}
-                </div>
-              ))}
-            </div>
+    <div className="space-y-4">
+      {["COMPLETE", "VALID", "CONSISTENT", "CREDIBLE"].map((l) => (
+        <div key={l}>
+          <div className="mb-1.5 text-xs font-semibold text-slate-700">{LAYER_LABEL[l]}</div>
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+            {checks.filter((c) => c.layer === l).map((c) => (
+              <div key={c.id}>
+                <button type="button" onClick={() => setOpen((p) => ({ ...p, [c.id]: !p[c.id] }))} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
+                  <CheckBadge status={c.status} />
+                  <span className="flex-1 text-sm text-slate-800">{PLAIN[c.id] ?? c.title} <span className="mono ml-1 text-[11px] text-slate-400">{c.id}</span></span>
+                  <span className="text-xs text-slate-400">{open[c.id] ? "−" : "+"}</span>
+                </button>
+                {open[c.id] && (
+                  <div className="space-y-1 bg-slate-50/70 px-4 py-3 text-xs text-slate-600">
+                    <div><b>Compared:</b> {c.checked}</div>
+                    {c.sources.map((s, i) => <div key={i}><b>{s.label}:</b> <span className="mono">{s.value}</span></div>)}
+                    <div><b>Rule:</b> {c.rule}</div><div><b>Result:</b> {c.reason}</div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function Evidence({ c }: { c: CheckResult }) {
-  return (
-    <div className="grid gap-x-6 gap-y-2 bg-slate-50/70 px-4 py-3 text-sm sm:grid-cols-[110px_1fr]">
-      <div className="text-xs font-medium text-slate-500">Checked</div><div className="text-slate-800">{c.checked}</div>
-      {c.sources.length > 0 && (<>
-        <div className="text-xs font-medium text-slate-500">Sources</div>
-        <div className="space-y-1">
-          {c.sources.map((s, i) => (
-            <div key={i} className="flex flex-wrap gap-x-2"><span className="text-slate-500">{s.label}:</span><span className="mono break-all text-slate-900">{s.value}</span></div>
-          ))}
         </div>
-      </>)}
-      <div className="text-xs font-medium text-slate-500">Rule</div><div className="text-slate-700">{c.rule}</div>
-      <div className="text-xs font-medium text-slate-500">Reason</div><div className="text-slate-900">{c.reason}</div>
-      {c.next_action && c.status !== "PASS" && (<><div className="text-xs font-medium text-slate-500">Next action</div><div className="text-slate-900">{c.next_action}</div></>)}
+      ))}
     </div>
   );
 }
 
 function Documents({ documents, running }: { documents: any[]; running: boolean }) {
-  const fieldLabel: Record<string, string> = { legal_name: "Name", pan: "PAN", gstin: "GSTIN", account_holder: "Account holder", account_number: "Account no.", ifsc: "IFSC", ein: "EIN", registration_state: "State" };
+  const fieldLabel: Record<string, string> = { legal_name: "Name", pan: "PAN", gstin: "GSTIN", account_holder: "Account holder", account_number: "Account no.", ifsc: "IFSC", ein: "EIN", registration_state: "State", trade_name: "Trade name", constitution: "Type", address_street: "Street", address_city: "City", address_pincode: "Pincode" };
   return (
-    <Card className="p-5">
-      <SectionTitle hint="Original document beside what the AI read from it">Documents</SectionTitle>
-      <div className="grid gap-4 xl:grid-cols-2">
-        {documents.map((d) => {
-          const r = d.extracted;
-          const wrong = r && r.doc_type !== d.slot;
-          return (
-            <div key={d.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[180px_1fr]">
-              <a href={d.url ?? undefined} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                {d.url && d.mime_type?.startsWith("image/") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={d.url} alt={d.file_name} className="h-32 w-full object-cover object-top" />
-                ) : d.url && d.mime_type === "application/pdf" ? (
-                  <iframe src={`${d.url}#toolbar=0&navpanes=0&view=FitH`} title={d.file_name} className="pointer-events-none h-32 w-full bg-white" />
-                ) : (
-                  <div className="grid h-32 place-items-center text-xs text-slate-500">{running ? "…" : "Preview unavailable"}</div>
-                )}
-              </a>
-              <div className="min-w-0 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-slate-900">{SLOT_LABEL[d.slot]}</span>
-                  {r && <Pill tone={wrong ? "amber" : "slate"}>AI: {r.doc_type === "UNREADABLE" ? "unreadable" : SLOT_LABEL[r.doc_type] ?? "other document"}</Pill>}
-                  {r && <span className="text-xs text-slate-500">legibility {Number(r.overall_confidence).toFixed(2)}</span>}
-                </div>
-                <div className="truncate text-xs text-slate-400">{d.file_name}</div>
-                {r && Object.keys(r.fields ?? {}).length > 0 && (
-                  <dl className="mt-2 grid grid-cols-[110px_1fr] gap-x-3 gap-y-1">
-                    {Object.entries(r.fields).map(([k, v]) => (
-                      <div key={k} className="contents">
-                        <dt className="text-xs text-slate-500">{fieldLabel[k] ?? k}</dt>
-                        <dd className="mono truncate text-xs text-slate-900">{String(v)} <span className="text-slate-400">({Number(r.confidence?.[k] ?? 0).toFixed(2)})</span></dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
+    <>
+      {documents.map((d) => {
+        const r = d.extracted;
+        const wrong = r && r.doc_type !== d.slot;
+        return (
+          <div key={d.id} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[170px_1fr]">
+            <a href={d.url ?? undefined} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+              {d.url && d.mime_type?.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={d.url} alt={d.file_name} className="h-32 w-full object-cover object-top" />
+              ) : d.url && d.mime_type === "application/pdf" ? (
+                <iframe src={`${d.url}#toolbar=0&navpanes=0&view=FitH`} title={d.file_name} className="pointer-events-none h-32 w-full bg-white" />
+              ) : (
+                <div className="grid h-32 place-items-center text-xs text-slate-500">{running ? "…" : "Preview unavailable"}</div>
+              )}
+            </a>
+            <div className="min-w-0 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-slate-900">{SLOT_LABEL[d.slot]}</span>
+                {r && <Pill tone={wrong ? "amber" : "slate"}>Read as: {r.doc_type === "UNREADABLE" ? "unreadable" : SLOT_LABEL[r.doc_type] ?? "other document"}</Pill>}
               </div>
+              <div className="truncate text-xs text-slate-400">{d.file_name}{r ? ` · clarity ${Number(r.overall_confidence).toFixed(2)}` : ""}</div>
+              {r && Object.keys(r.fields ?? {}).length > 0 && (
+                <dl className="mt-2 grid grid-cols-[100px_1fr] gap-x-3 gap-y-1">
+                  {Object.entries(r.fields).map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="text-xs text-slate-500">{fieldLabel[k] ?? k}</dt>
+                      <dd className="mono truncate text-xs text-slate-900">{String(v)} <span className="text-slate-400">({Number(r.confidence?.[k] ?? 0).toFixed(2)})</span></dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
-          );
-        })}
-      </div>
-    </Card>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
-function Message({ message, email }: { message: any; email?: string }) {
+function MessageCard({ message, email }: { message: any; email?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <Card className="p-5">
-      <SectionTitle hint={<>Draft only, not sent · {message.generated_by === "openai" ? "written by AI from the verified findings" : "template from the verified findings"}</>}>Message to the vendor</SectionTitle>
-      {message.analyst_summary && <p className="mb-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600"><b>Internal note:</b> {message.analyst_summary}</p>}
+      <SectionTitle hint="Draft only, nothing is sent for you">Message to the vendor</SectionTitle>
       <div className="rounded-lg border border-slate-200">
-        <div className="border-b border-slate-100 px-4 py-2 text-sm"><span className="text-slate-500">Subject:</span> <span className="font-medium">{message.subject}</span></div>
-        <pre className="whitespace-pre-wrap px-4 py-3 font-sans text-sm leading-relaxed text-slate-800">{message.body}</pre>
+        <div className="border-b border-slate-100 px-4 py-2 text-sm"><span className="text-slate-500">Subject:</span> <span className="font-medium"><Rich text={message.subject} /></span></div>
+        <div className="whitespace-pre-wrap px-4 py-3 text-sm leading-relaxed text-slate-800"><Rich text={message.body} /></div>
       </div>
-      <a className={`${btnPrimary} mt-3 mr-2`} href={mailto(email, message)}>Send to vendor</a>
-      <button type="button" className={`${btnSecondary} mt-3`} onClick={() => { navigator.clipboard.writeText(`Subject: ${message.subject}\n\n${message.body}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
-        {copied ? "Copied" : "Copy message"}
-      </button>
+      <div className="mt-3 flex gap-2">
+        <a className={btnPrimary} href={mailtoLink(email, message)}>Send to vendor</a>
+        <button type="button" className={btnSecondary} onClick={() => { navigator.clipboard.writeText(`Subject: ${plainText(message.subject)}\n\n${plainText(message.body)}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
     </Card>
   );
 }
@@ -307,26 +321,23 @@ function ReviewPanel({ run, actions, onDone }: { run: any; actions: any[]; onDon
     setReason("");
     onDone();
   };
+  const ok = reason.trim().length >= 10;
   return (
-    <Card className="border-orange-200 p-5"><div id="review" className="-mt-24 pt-24" />
-      <SectionTitle hint="Your decision and reason are saved to the audit log">Reviewer decision</SectionTitle>
+    <Card className="border-orange-200 p-5">
+      <SectionTitle>Your decision</SectionTitle>
       {actions.length > 0 ? (
         <ul className="space-y-2 text-sm">
           {actions.map((a: any) => (
-            <li key={a.id} className="rounded-md bg-slate-50 px-3 py-2">
-              <b>{a.action.replace("_", " ").toLowerCase()}</b> by {a.reviewer} · {new Date(a.created_at).toLocaleString()}<br />
-              <span className="text-slate-600">“{a.reason}”</span>
-            </li>
+            <li key={a.id} className="rounded-md bg-slate-50 px-3 py-2"><b>{a.action.replace("_", " ").toLowerCase()}</b> by {a.reviewer}<br /><span className="text-slate-600">“{a.reason}”</span></li>
           ))}
         </ul>
       ) : (
         <>
-          <p className="mb-3 text-sm text-slate-600">The system flagged this vendor but did not reject it: a fraud signal is not proof. Check the evidence below, then decide.</p>
-          <textarea className={`${inputCls} min-h-[80px]`} placeholder="Reason (required, at least 10 characters), e.g. 'Called the vendor; account belongs to their sister concern, bank letter received.'" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <textarea className={`${inputCls} min-h-[76px]`} placeholder="Why? (at least 10 characters)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-3 flex flex-wrap gap-2">
-            <button className={btnPrimary} disabled={busy || reason.trim().length < 10} onClick={() => act("APPROVE")}>Approve</button>
-            <button className={btnSecondary} disabled={busy || reason.trim().length < 10} onClick={() => act("REQUEST_INFO")}>Ask vendor for more</button>
-            <button className={`${btnSecondary} text-rose-700`} disabled={busy || reason.trim().length < 10} onClick={() => act("REJECT")}>Reject</button>
+            <button className={btnPrimary} disabled={busy || !ok} onClick={() => act("APPROVE")}>Approve</button>
+            <button className={btnSecondary} disabled={busy || !ok} onClick={() => act("REQUEST_INFO")}>Ask vendor for more</button>
+            <button className={`${btnSecondary} text-rose-700`} disabled={busy || !ok} onClick={() => act("REJECT")}>Reject</button>
           </div>
           {err && <p className="mt-2 text-sm text-rose-700">{err}</p>}
         </>
@@ -340,7 +351,7 @@ const TOAST: Record<string, { label: string; color: string; icon: string }> = {
   PENDING_INFO: { label: "Waiting on the vendor", color: "text-amber-500", icon: "M12 7v6m0 3.5v.01" },
   MANUAL_REVIEW: { label: "Needs a reviewer", color: "text-orange-500", icon: "M12 7v6m0 3.5v.01" },
   REJECTED: { label: "Rejected", color: "text-rose-600", icon: "M8 8l8 8m0-8l-8 8" },
-  FAILED: { label: "Run failed", color: "text-rose-600", icon: "M8 8l8 8m0-8l-8 8" },
+  FAILED: { label: "Check failed", color: "text-rose-600", icon: "M8 8l8 8m0-8l-8 8" },
 };
 
 function ResultToast({ status }: { status: string }) {

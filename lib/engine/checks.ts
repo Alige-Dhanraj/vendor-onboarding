@@ -106,7 +106,7 @@ function c1(ctx: CheckContext): CheckResult {
     sources: [formSrc(`missing: ${missing.join(", ")}`)],
     reason: `${missing.length} required field${missing.length > 1 ? "s are" : " is"} blank: ${missing.join(", ")}.`,
     next_action: "Ask the vendor to fill the missing fields.",
-    vendor_fix: `Please fill in: ${missing.join(", ")}.`,
+    vendor_fix: `**Missing details**: ${missing.join(", ")}`,
   });
 }
 
@@ -120,7 +120,7 @@ function c2(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Missing: ${names.join(", ")}.`,
     next_action: "Ask the vendor to upload the missing documents.",
-    vendor_fix: `Please upload: ${names.join(", ")}.`,
+    vendor_fix: missing.map((s) => `**${DOC_LABEL[s]}**: missing`).join("\n"),
   });
 }
 
@@ -134,7 +134,7 @@ function c3(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Wrong document: ${desc.join("; ")}.`,
     next_action: "Ask the vendor to upload the correct document in each slot.",
-    vendor_fix: wrong.map((d) => `The file you uploaded as your ${DOC_LABEL[d.slot]} is ${DOC_TYPE_LABEL[d.doc_type]}. Please upload your ${DOC_LABEL[d.slot]} instead.`).join(" "),
+    vendor_fix: wrong.map((d) => `**${DOC_LABEL[d.slot]}**: wrong file (this is ${DOC_TYPE_LABEL[d.doc_type]})`).join("\n"),
   });
 }
 
@@ -148,7 +148,7 @@ function c4(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Could not read reliably: ${names.join(", ")}. Values from ${bad.length > 1 ? "these documents" : "this document"} are treated as unverified, not guessed.`,
     next_action: "Ask the vendor for a clearer copy; checks that depend on it stay unverified.",
-    vendor_fix: `We could not read your ${names.join(" and ")} clearly. Please upload a sharper scan or the original PDF.`,
+    vendor_fix: bad.map((d) => `**${DOC_LABEL[d.slot]}**: too blurry, please send a clearer copy`).join("\n"),
   });
 }
 
@@ -159,7 +159,7 @@ function v1(ctx: CheckContext): CheckResult {
   const b: Base = { id: "V1", layer: "VALID", title: "PAN format", checked: "PAN typed in the form", rule: "V1: a PAN is 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)." };
   if (!isIndia(ctx) || !pan) return result(b, "SKIPPED", null, { reason: isIndia(ctx) ? "No PAN given (see C1)." : "Not an Indian vendor." });
   if (isPan(pan)) return result(b, "PASS", null, { sources: [formSrc(pan)], reason: "PAN has the correct format." });
-  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(pan)], reason: `"${pan}" does not match the PAN format.`, next_action: "Ask the vendor to re-enter the PAN.", vendor_fix: `The PAN "${pan}" is not in the valid format (5 letters, 4 digits, 1 letter). Please re-check it.` });
+  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(pan)], reason: `"${pan}" does not match the PAN format.`, next_action: "Ask the vendor to re-enter the PAN.", vendor_fix: `**PAN**: "${pan}" is not in the right format` });
 }
 
 function v2(ctx: CheckContext): CheckResult {
@@ -168,7 +168,7 @@ function v2(ctx: CheckContext): CheckResult {
   if (!gstRegistered(ctx) || !g) return result(b, "SKIPPED", null, { reason: gstRegistered(ctx) ? "No GSTIN given (see C1)." : "Vendor is not GST-registered." });
   const s = gstinStructure(g);
   if (s.ok) return result(b, "PASS", null, { sources: [formSrc(g)], reason: `Structure is valid (state: ${gstinState(g)}).` });
-  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(g)], reason: `GSTIN ${s.problem}.`, next_action: "Ask the vendor to re-enter the GSTIN.", vendor_fix: `The GSTIN "${g}" is not valid: it ${s.problem}. Please copy it exactly from your GST certificate.` });
+  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(g)], reason: `GSTIN ${s.problem}.`, next_action: "Ask the vendor to re-enter the GSTIN.", vendor_fix: `**GSTIN**: it ${s.problem}` });
 }
 
 function v3(ctx: CheckContext): CheckResult {
@@ -176,7 +176,7 @@ function v3(ctx: CheckContext): CheckResult {
   const b: Base = { id: "V3", layer: "VALID", title: "GSTIN check character", checked: "Last character of the GSTIN", rule: "V3: the 15th character is a mod-36 check character computed from the first 14; a typo almost always breaks it." };
   if (!gstRegistered(ctx) || !g || !gstinStructure(g).ok) return result(b, "SKIPPED", null, { reason: "Needs a structurally valid GSTIN (see V2)." });
   if (gstinChecksumOk(g)) return result(b, "PASS", null, { sources: [formSrc(g)], reason: "Check character verifies." });
-  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(g)], reason: "The check character does not match the first 14 characters, which usually means a typo.", next_action: "Ask the vendor to re-check the GSTIN.", vendor_fix: `The GSTIN "${g}" fails its built-in check, which usually means a typing error. Please copy it exactly from your GST certificate.` });
+  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(g)], reason: "The check character does not match the first 14 characters, which usually means a typo.", next_action: "Ask the vendor to re-check the GSTIN.", vendor_fix: "**GSTIN**: looks mistyped, please copy it from your GST certificate" });
 }
 
 function v4(ctx: CheckContext): CheckResult {
@@ -186,13 +186,13 @@ function v4(ctx: CheckContext): CheckResult {
     const b: Base = { id: "V4", layer: "VALID", title: "Bank routing number format", checked: "US routing number", rule: "V4: a US ABA routing number is 9 digits with a 3-7-1 weighted checksum." };
     if (!rn) return result(b, "SKIPPED", null, { reason: "No routing number (see C1)." });
     if (isRoutingNumber(rn)) return result(b, "PASS", null, { sources: [formSrc(rn)], reason: "Routing number is valid." });
-    return result(b, "FAIL", "FIXABLE", { sources: [formSrc(rn)], reason: "Routing number fails the format or checksum.", next_action: "Ask the vendor to re-check it.", vendor_fix: `The routing number "${rn}" is not valid. Please re-check it with your bank.` });
+    return result(b, "FAIL", "FIXABLE", { sources: [formSrc(rn)], reason: "Routing number fails the format or checksum.", next_action: "Ask the vendor to re-check it.", vendor_fix: `**Routing number**: "${rn}" is not valid` });
   }
   const ifsc = f.bank.ifsc ?? "";
   const b: Base = { id: "V4", layer: "VALID", title: "IFSC format", checked: "IFSC typed in the form", rule: "V4: an IFSC is 4 letters (bank), then 0, then 6 letters or digits (branch)." };
   if (!ifsc) return result(b, "SKIPPED", null, { reason: "No IFSC (see C1)." });
   if (isIfsc(ifsc)) return result(b, "PASS", null, { sources: [formSrc(ifsc)], reason: "IFSC has the correct format." });
-  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(ifsc)], reason: `"${ifsc}" does not match the IFSC format.`, next_action: "Ask the vendor to re-check it.", vendor_fix: `The IFSC "${ifsc}" is not valid. It should look like ABCD0123456. Please re-check it.` });
+  return result(b, "FAIL", "FIXABLE", { sources: [formSrc(ifsc)], reason: `"${ifsc}" does not match the IFSC format.`, next_action: "Ask the vendor to re-check it.", vendor_fix: `**IFSC**: "${ifsc}" is not valid (it looks like ABCD0123456)` });
 }
 
 function v5(ctx: CheckContext): CheckResult {
@@ -207,7 +207,7 @@ function v5(ctx: CheckContext): CheckResult {
     sources: [formSrc(ein), { label: "Country on form", value: "United States" }],
     reason: looksIndian ? `"${ein}" is an Indian tax ID format, but the vendor says it is in the United States.` : `"${ein}" is not a 9-digit EIN.`,
     next_action: "Ask the vendor for their US EIN.",
-    vendor_fix: `As a US vendor, please provide your 9-digit EIN (format NN-NNNNNNN). "${ein}" is not in that format.`,
+    vendor_fix: "**EIN**: please give your 9-digit US EIN (NN-NNNNNNN)",
   });
 }
 
@@ -222,7 +222,7 @@ function v6(ctx: CheckContext): CheckResult {
   if (f.contact.alt_phone && !isPhone(f.contact.alt_phone, f.country)) issues.push(`alternate mobile "${f.contact.alt_phone}"`);
   const sources = [formSrc(`${pc} · ${f.contact.email} · ${f.contact.phone}`)];
   if (!issues.length) return result(b, "PASS", null, { sources, reason: "Contact details are well-formed." });
-  return result(b, "FAIL", "FIXABLE", { sources, reason: `Not valid: ${issues.join(", ")}.`, next_action: "Ask the vendor to correct them.", vendor_fix: `Please correct your ${issues.join(", ")}.` });
+  return result(b, "FAIL", "FIXABLE", { sources, reason: `Not valid: ${issues.join(", ")}.`, next_action: "Ask the vendor to correct them.", vendor_fix: `**Contact details**: please correct ${issues.join(", ")}` });
 }
 
 // ---------- CONSISTENT ----------
@@ -257,7 +257,7 @@ function k1(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Typed values don't match: ${issues.join("; ")}.`,
     next_action: "Ask the vendor to correct the typed PAN/GSTIN.",
-    vendor_fix: `Your tax details don't match each other: ${issues.join("; ")}. Please correct the form so it matches your documents.`,
+    vendor_fix: "**PAN / GSTIN**: do not match your documents, please correct them",
   });
 }
 
@@ -276,7 +276,7 @@ function k2(ctx: CheckContext): CheckResult {
     sources,
     reason: `The PAN's 4th letter is "${actual}" (${PAN_HOLDER_TYPES[actual] ?? "unknown type"}), but a ${f.entity_type.replace("_", " ").toLowerCase()} should have "${expected}" (${PAN_HOLDER_TYPES[expected]}). This may be a personal PAN given instead of the business PAN.`,
     next_action: "Ask the vendor for the PAN registered to the business.",
-    vendor_fix: `The PAN provided belongs to a ${PAN_HOLDER_TYPES[actual] ?? "different holder type"}, not a ${f.entity_type.replace("_", " ").toLowerCase()}. Please provide the PAN issued to the business.`,
+    vendor_fix: `**PAN**: this is a ${(PAN_HOLDER_TYPES[actual] ?? "different holder type").toLowerCase()} PAN, please send the business PAN`,
   });
 }
 
@@ -306,7 +306,7 @@ function k4(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `The GSTIN is registered in ${st} (code ${clean(g).slice(0, 2)}), but the address is in ${f.address.state}.`,
     next_action: "Ask the vendor for the GSTIN registered in the billing state, or a billing address that matches.",
-    vendor_fix: `Your GSTIN is registered in ${st}, but your address is in ${f.address.state}. Please share the GSTIN for your ${f.address.state} registration, or confirm the correct billing address.`,
+    vendor_fix: `**GSTIN or address**: GSTIN is for ${st} but the address is in ${f.address.state}, please send the right one`,
   });
 }
 
@@ -329,7 +329,7 @@ function k5(ctx: CheckContext): CheckResult {
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Legal name differs: ${desc.join("; ")}.`,
     next_action: "Ask the vendor to correct the legal name to match their registration documents.",
-    vendor_fix: `The legal name on your form ("${f.legal_name}") doesn't match your documents (${bad.map((x) => `"${x.o.value}"`).join(", ")}). Please enter your registered legal name exactly as on your GST/PAN records.`,
+    vendor_fix: "**Legal name**: does not match your documents, please use the exact registered name",
   });
 }
 
@@ -376,7 +376,7 @@ function k7(ctx: CheckContext): CheckResult {
   if (isIndia(ctx) && ifsc && clean(ifsc.value) !== clean(f.bank.ifsc)) issues.push(`IFSC (form ${clean(f.bank.ifsc)}, document ${clean(ifsc.value)})`);
   const sources = [formSrc(`${mask(f.bank.account_number)} · ${f.bank.ifsc ?? f.bank.routing_number ?? ""}`), ...(acct ? [{ ...acct.src, value: mask(acct.value) }] : []), ...(ifsc ? [ifsc.src] : [])];
   if (!issues.length) return result(b, "PASS", null, { sources, reason: "Bank details match the bank proof." });
-  return result(b, "FAIL", "FIXABLE", { sources, reason: `Mismatch in ${issues.join(" and ")}.`, next_action: "Ask the vendor to correct the bank details.", vendor_fix: `The bank details on your form don't match your cancelled cheque: ${issues.join(" and ")}. Please correct them.` });
+  return result(b, "FAIL", "FIXABLE", { sources, reason: `Mismatch in ${issues.join(" and ")}.`, next_action: "Ask the vendor to correct the bank details.", vendor_fix: "**Bank details**: do not match your cancelled cheque, please correct them" });
 }
 
 // ---------- CREDIBLE ----------
@@ -406,6 +406,7 @@ function r2(ctx: CheckContext): CheckResult {
       sources: [formSrc(`PAN ${pan || "-"} · GSTIN ${gstin || "-"}`), { label: "Vendor master", value: `${dup.legal_name} (${dup.id}): PAN ${dup.pan ?? "-"} · GSTIN ${dup.gstin ?? "-"}` }],
       reason: `This ${dup.gstin === gstin && gstin ? "GSTIN" : "PAN"} is already registered to existing vendor "${dup.legal_name}" (${dup.id}).`,
       next_action: `Rejected as a duplicate. Point the requester to existing record ${dup.id} instead of creating a second vendor.`,
+      vendor_fix: "You are already registered with us, so we can't create a second record.",
     });
   }
   const similar = f.legal_name ? ctx.vendorMaster.find((v) => nameSimilarity(v.legal_name, f.legal_name) >= 0.75) : undefined;
@@ -431,6 +432,7 @@ function r3(ctx: CheckContext): CheckResult {
     sources: [formSrc(f.legal_name), { label: "Internal blocklist", value: `${hit.name ?? hit.pan ?? "bank account"}: ${hit.reason}` }],
     reason: `Matches a blocklist entry (${hit.reason}).`,
     next_action: "Rejected. Escalate to compliance if the vendor disputes it.",
+    vendor_fix: "We can't proceed with this registration.",
   });
 }
 
@@ -443,7 +445,7 @@ function r4(ctx: CheckContext): CheckResult {
   if (!entry) return result(b, "WARN", "WARNING", { sources: [formSrc(g), { label: "TEST REGISTRY", value: "not found" }], reason: "GSTIN is not in the TEST REGISTRY, so its status could not be confirmed.", next_action: "Reviewer note; in production this would be a live GST portal lookup." });
   const src = { label: "TEST REGISTRY (not the live GST portal)", value: `${g}: ${entry.status}, ${entry.legal_name}` };
   if (entry.status === "ACTIVE") return result(b, "PASS", null, { sources: [src], reason: "Registration is active in the TEST REGISTRY." });
-  return result(b, "FAIL", "HARD_STOP", { sources: [src], reason: "The GST registration is cancelled in the TEST REGISTRY.", next_action: "Rejected. The vendor cannot be onboarded on a cancelled GST registration." });
+  return result(b, "FAIL", "HARD_STOP", { sources: [src], reason: "The GST registration is cancelled in the TEST REGISTRY.", next_action: "Rejected. The vendor cannot be onboarded on a cancelled GST registration.", vendor_fix: "Your GST registration shows as cancelled." });
 }
 
 // ---------- run ----------

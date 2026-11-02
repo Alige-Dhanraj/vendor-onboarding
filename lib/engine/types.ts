@@ -38,6 +38,11 @@ export interface ExtractedFields {
   ifsc?: string;
   ein?: string;
   registration_state?: string;
+  trade_name?: string;
+  constitution?: string;       // "Constitution of Business" on a GST certificate, e.g. Private Limited Company
+  address_street?: string;
+  address_city?: string;
+  address_pincode?: string;
 }
 
 /** One uploaded document after the AI has read it. */
