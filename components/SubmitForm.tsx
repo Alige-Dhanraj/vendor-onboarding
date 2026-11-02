@@ -58,7 +58,7 @@ async function sampleFile(name: string): Promise<File> {
 export default function SubmitForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const demo = params.get("demo") === "1";
+  const demo = true; // test vendors always shown for now (below the form)
   const [form, setForm] = useState<SubmissionForm>(EMPTY);
   const [docs, setDocs] = useState<Doc[]>([]);
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
