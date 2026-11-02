@@ -5,6 +5,7 @@ import { NextResponse, after } from "next/server";
 import { getStore } from "@/lib/store";
 import { IntakeError, SLOTS, slug, submit, type IncomingFile } from "@/lib/workflow/intake";
 import { latestBundle, loadInvite, vendorState } from "@/lib/workflow/invite";
+import { TOO_MANY, allow } from "@/lib/workflow/limit";
 import { aiMode, executeRun } from "@/lib/workflow/run";
 import type { SubmissionForm } from "@/lib/engine/types";
 
@@ -17,6 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const loaded = await loadInvite(store, token);
   if ("error" in loaded) return NextResponse.json({ error: loaded.error }, { status: loaded.status });
   const { invite } = loaded;
+  if (!allow(`submit:${token}`, 10, 3600_000)) return NextResponse.json({ error: TOO_MANY }, { status: 429 });
   try {
     const previous = await latestBundle(store, invite);
     if (previous && vendorState(previous) !== "NEED_INFO") return NextResponse.json({ error: "Your details can't be changed right now." }, { status: 409 });

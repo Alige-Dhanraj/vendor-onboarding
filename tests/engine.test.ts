@@ -317,3 +317,12 @@ test("deactivate and reactivate: records kept, inactive vendors still block dupl
   await assert.rejects(changeVendorStatus(b, { runId: bid, action: "REACTIVATE", by: "T" }), /fraud/);
   assert.equal(BLOCKLIST_SEED.some((e) => e.name === sc.form.legal_name), false, "the shared seed list is not changed");
 });
+
+test("rate limit: allows up to the limit, then blocks until the window passes", async () => {
+  const { allow } = await import("../lib/workflow/limit");
+  const t = 1_000_000;
+  assert.ok(allow("k1", 2, 1000, t) && allow("k1", 2, 1000, t + 1));
+  assert.equal(allow("k1", 2, 1000, t + 2), false);
+  assert.ok(allow("k1", 2, 1000, t + 1500), "allowed again after the window");
+  assert.ok(allow("k2", 2, 1000, t), "other keys are not affected");
+});
