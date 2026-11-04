@@ -377,6 +377,8 @@ function ResultToast({ status }: { status: string }) {
 function RecordCard({ id, form, actions }: { id: string; form: any; actions: any[] }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [connected, setConnected] = useState(false);
+  useEffect(() => { fetch(`/api/runs/${id}/export`).then((r) => r.json()).then((j) => setConnected(!!j.connected)).catch(() => {}); }, [id]);
   const by = actions.find((a: any) => a.action === "APPROVE")?.reviewer ?? "VendorGate automatic checks";
   const us = form.country === "US";
   const rows: [string, string][] = [
@@ -401,7 +403,7 @@ function RecordCard({ id, form, actions }: { id: string; form: any; actions: any
       </dl>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <a className={btnSecondary} href={`/api/runs/${id}/record?format=csv`}>Download CSV</a>
-        <button className={btnSecondary} onClick={send} disabled={busy}>{busy ? "Sending…" : "Send to accounting system"}</button>
+        {connected && <button className={btnSecondary} onClick={send} disabled={busy}>{busy ? "Sending…" : "Send to accounting system"}</button>}
         {note && <span className={`text-sm ${note.ok ? "text-emerald-700" : "text-rose-700"}`}>{note.text}</span>}
       </div>
     </Card>

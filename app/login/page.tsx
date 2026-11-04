@@ -22,15 +22,15 @@ function LoginForm() {
   }
 
   return (
-    <div className="mx-auto mt-16 max-w-sm">
+    <div className="hero-gradient mx-auto mt-6 max-w-md rounded-3xl p-5 sm:mt-12 sm:p-8">
       <div className="mb-6 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-900 text-sm font-bold text-white">VG</span>
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-black text-sm font-bold text-white">VG</span>
         <div>
           <div className="text-xl font-semibold tracking-tight">VendorGate</div>
-          <div className="text-sm text-slate-500">Check new vendors in minutes</div>
+          <div className="text-sm text-slate-700">Check new vendors in minutes</div>
         </div>
       </div>
-      <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <form onSubmit={onSubmit} className="space-y-4 rounded-2xl bg-white p-6">
         <h1 className="text-lg font-semibold">Sign in</h1>
         <Field label="Email" required><input className={inputCls} type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
         <Field label="Password" required><input className={inputCls} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>

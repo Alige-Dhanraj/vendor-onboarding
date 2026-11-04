@@ -2,13 +2,13 @@ import type { ReactNode } from "react";
 import { CHECK_STYLE, STATUS_STYLE } from "@/lib/ui-labels";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>;
+  return <div className={`rounded-2xl border border-slate-200 bg-white ${className}`}>{children}</div>;
 }
 
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{children}</h2>
+      <h2 className="label font-medium text-slate-500">{children}</h2>
       {hint && <div className="text-xs text-slate-500">{hint}</div>}
     </div>
   );
@@ -43,6 +43,6 @@ export function Field({ label, children, hint, required }: { label: string; chil
   );
 }
 
-export const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base shadow-sm outline-none focus:border-indigo-500 sm:text-sm focus:ring-2 focus:ring-indigo-100";
-export const btnPrimary = "inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:py-2";
-export const btnSecondary = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 sm:py-2";
+export const inputCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-slate-900 sm:text-sm focus:ring-2 focus:ring-slate-200";
+export const btnPrimary = "inline-flex items-center justify-center rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 sm:py-2";
+export const btnSecondary = "inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 sm:py-2";

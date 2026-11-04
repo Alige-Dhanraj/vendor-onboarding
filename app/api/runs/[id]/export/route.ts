@@ -7,6 +7,15 @@ import { buildRecord, isApproved } from "@/lib/workflow/record";
 
 export const runtime = "nodejs";
 
+/** GET: tells the page whether an accounting system is connected, so the button only shows when it works. */
+export async function GET() {
+  const g = await guard();
+  if ("error" in g) return g.error;
+  let ok = false;
+  try { const u = new URL(process.env.ACCOUNTING_WEBHOOK_URL ?? ""); ok = /^https?:$/.test(u.protocol); } catch { ok = false; }
+  return NextResponse.json({ connected: ok });
+}
+
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const g = await guard();
   if ("error" in g) return g.error;

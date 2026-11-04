@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-html { background: #f6f7f9; color: #111827; }
+html { background: #ffffff; color: #0f1115; }
 body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 .mono { font-family: var(--font-mono); }
 
@@ -16,3 +16,8 @@ body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 .toast-card { animation: toast-in 2.4s ease forwards; }
 @keyframes draw { to { stroke-dashoffset: 0 } }
 .tick-draw { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .5s .15s ease forwards; }
+
+/* Look and feel: calm white page, soft sky-to-peach gradient, black pill buttons, mono labels */
+.hero-gradient { background: linear-gradient(180deg, #a9d2f6 0%, #d3e6f8 38%, #fde5d2 72%, #fbc2a8 100%); }
+.label { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+h1, h2 { letter-spacing: -0.02em; }
