@@ -6,6 +6,7 @@
 //
 // AI reads and writes; rules decide.
 
+import { isKnownSample } from "@/lib/ai/known-samples";
 import { createHash } from "node:crypto";
 import { LAYERS, namePairsToJudge, runChecks } from "../engine/checks";
 import { DEFAULT_CONFIDENCE_THRESHOLD } from "../engine/evaluate";
@@ -54,7 +55,7 @@ async function readOne(store: Store, doc: DocumentRow, scenarioId: string | null
   }
   const sc = scenarioId ? scenarioById(scenarioId) : undefined;
   const truth = sc && [...sc.docs, ...(sc.resubmission?.docs ?? [])].find((d) => d.file_name === doc.file_name && d.slot === doc.slot);
-  if (truth) {
+  if (truth && doc.file_hash && isKnownSample(doc.file_name, doc.file_hash)) {
     const reading: ExtractedDoc = { slot: doc.slot, file_name: doc.file_name, ...truth.truth };
     if (doc.file_hash) await store.cacheSet(key, reading, "offline");
     return { reading, via: "offline fixture" };
@@ -176,7 +177,8 @@ export async function executeRun(store: Store, runId: string, opts: RunOptions =
 
 export async function addToVendorMaster(store: Store, form: import("../engine/types").SubmissionForm, runId: string) {
   const existing = await store.getVendorMaster();
-  const id = `VM-${String(existing.length + 1).padStart(3, "0")}`;
+  const top = existing.reduce((m, v) => Math.max(m, Number(/^VM-(\d+)$/.exec(v.id)?.[1] ?? 0)), 0);
+  const id = `VM-${String(top + 1).padStart(3, "0")}`;
   await store.addVendor({
     id, legal_name: form.legal_name, pan: form.tax.pan?.toUpperCase(), gstin: form.tax.gstin?.toUpperCase(),
     bank_account_hash: hashAccount(form.bank.account_number), bank_last4: last4(form.bank.account_number),

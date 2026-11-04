@@ -15,6 +15,8 @@ export async function POST(req: Request) {
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Enter the vendor's name and a valid email." }, { status: 400 });
   try {
     const invite = await getStore().createInvite({ contact_name: name, contact_email: email, created_by: g.session.name, days: INVITE_DAYS });
+    const ref = String(body?.vendor_ref ?? "").trim();
+    if (ref) await getStore().setInviteVendorRef(invite.token, ref);
     return NextResponse.json({ token: invite.token, expires_at: invite.expires_at });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

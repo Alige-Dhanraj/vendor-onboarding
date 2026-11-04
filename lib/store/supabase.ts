@@ -163,6 +163,10 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
     },
     async resetDemo({ vendors, blocklist }) {
       // Deletes all submissions (runs, events, checks, messages, reviewer actions cascade) and restores the seed vendors.
+      // Remove the uploaded files first, so no documents are left behind in storage.
+      const docRows = must(await db.from("documents").select("storage_path").not("storage_path", "is", null), "list files") as { storage_path: string }[] | null;
+      const paths = [...new Set((docRows ?? []).map((d) => d.storage_path))];
+      for (let i = 0; i < paths.length; i += 100) await db.storage.from(BUCKET).remove(paths.slice(i, i + 100));
       must(await db.from("invites").delete().not("token", "is", null), "clear invites");
       must(await db.from("submissions").delete().not("id", "is", null), "clear submissions");
       must(await db.from("vendor_master").delete().not("id", "is", null), "clear vendor master");

@@ -50,7 +50,7 @@ Without Supabase keys, data is kept in memory (local only).
 ## Tests
 
 ```bash
-npm test          # 28 unit tests: ID rules, GSTIN check character, names, policy, every scenario, evidence
+npm test          # 46 unit tests: ID rules, GSTIN check character, names, policy, every scenario, evidence
 npm run e2e       # full workflow on the real SAMPLE files: 12 scenarios, resubmission, reviewer rules
 ```
 

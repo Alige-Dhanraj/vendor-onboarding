@@ -107,7 +107,7 @@ export default function RunView({ id }: { id: string }) {
               {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, withLink(message, data.invite_token))}>Send to vendor</a>}
               {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
-              {status === "PENDING_INFO" && <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link>}
+              {status === "PENDING_INFO" && (submission.scenario_id ? <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link> : <CorrectDocs token={data.invite_token} vendorRef={submission.vendor_ref} name={form.contact?.name} email={form.contact?.email} />)}
               {status === "APPROVED" && !inactive && <Link className={btnSecondary} href="/new">Next vendor</Link>}
               {inactive && canDecide && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
             </div>
@@ -467,4 +467,19 @@ function VendorLifecycle({ id, vendor, canDecide, onDone }: { id: string; vendor
       {err && <p className="mt-2 text-sm text-rose-700">{err}</p>}
     </Card>
   );
+}
+
+/** Opens the vendor's own page (it keeps every earlier document), creating the private link first if there is none. */
+function CorrectDocs({ token, vendorRef, name, email }: { token?: string | null; vendorRef: string; name?: string; email?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (token) return <Link className={btnSecondary} href={`/invite/${token}`}>Add corrected documents</Link>;
+  async function go() {
+    setBusy(true); setErr(null);
+    const res = await fetch("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_name: name || "Vendor", contact_email: email, vendor_ref: vendorRef }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) { setErr(j.error ?? "Could not open the correction page."); setBusy(false); return; }
+    window.location.href = `/invite/${j.token}`;
+  }
+  return (<><button className={btnSecondary} onClick={go} disabled={busy}>{busy ? "Opening…" : "Add corrected documents"}</button>{err && <span className="text-sm text-rose-700">{err}</span>}</>);
 }

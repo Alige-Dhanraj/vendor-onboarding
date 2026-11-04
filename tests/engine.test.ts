@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -281,7 +283,7 @@ test("deactivate and reactivate: records kept, inactive vendors still block dupl
   const sc = SCENARIOS[0];
   const fresh = () => createMemoryStore({ vendors: VENDOR_MASTER_SEED, blocklist: [...BLOCKLIST_SEED], registry: TEST_REGISTRY });
   const approve = async (store: ReturnType<typeof fresh>, ref: string) => {
-    const files = sc.docs.map((d) => ({ slot: d.slot, name: d.file_name, mime: "image/png", bytes: new Uint8Array(Buffer.from(`${ref}-${d.file_name}`)) }));
+    const files = sc.docs.map((d) => ({ slot: d.slot, name: d.file_name, mime: "image/png", bytes: new Uint8Array(readFileSync(join(process.cwd(), "public", "samples", d.file_name))) }));
     const sub = await submit(store, { form: sc.form, vendorRef: ref, scenarioId: sc.id, files });
     const run = await store.createRun(sub.id, aiMode());
     await executeRun(store, run.id);

@@ -6,12 +6,14 @@ import { readDocument } from "@/lib/ai/read-document";
 import { readCacheKey, sha256 } from "@/lib/workflow/run";
 import { ALLOWED_MIME, MAX_FILE_BYTES, SLOTS } from "@/lib/workflow/intake";
 import { SCENARIOS } from "@/lib/scenarios";
+import { isKnownSample } from "@/lib/ai/known-samples";
 import { fixFixedPositions, gstinPan, gstinState } from "@/lib/engine/ids";
 import { mapEntityType } from "@/lib/engine/entity";
 import type { DocSlot, ExtractedDoc } from "@/lib/engine/types";
 
 
-function offlineReading(name: string): ExtractedDoc | null {
+function offlineReading(name: string, hash: string): ExtractedDoc | null {
+  if (!isKnownSample(name, hash)) return null;
   for (const s of SCENARIOS) for (const d of [...s.docs, ...(s.resubmission?.docs ?? [])]) {
     if (d.file_name === name) return { slot: d.truth.doc_type as DocSlot, file_name: name, ...d.truth };
   }
@@ -27,7 +29,7 @@ export async function prefillFromFormData(fd: FormData) {
     let reading: ExtractedDoc | null = null;
     if (aiEnabled()) {
       try { reading = await readDocument({ slot: null, fileName: f.name, mime: f.type, bytes }); } catch { reading = null; }
-    } else reading = offlineReading(f.name);
+    } else reading = offlineReading(f.name, sha256(bytes));
     if (reading && SLOTS.includes(reading.doc_type as DocSlot)) {
       await store.cacheSet(readCacheKey(reading.doc_type, sha256(bytes)), { ...reading, slot: reading.doc_type }, aiEnabled() ? aiModel() : "offline");
     }
