@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { CHECK_STYLE, STATUS_STYLE } from "@/lib/ui-labels";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-slate-200 bg-white ${className}`}>{children}</div>;
+  return <div className={`rounded-xl border border-slate-100 bg-white shadow-[0_20px_27px_rgba(0,0,0,0.05)] ${className}`}>{children}</div>;
 }
 
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
@@ -17,7 +17,7 @@ export function SectionTitle({ children, hint }: { children: ReactNode; hint?: R
 export function StatusBadge({ status, size = "sm" }: { status: string; size?: "sm" | "lg" }) {
   const s = STATUS_STYLE[status] ?? { label: status, cls: "bg-slate-100 text-slate-700 ring-slate-200" };
   return (
-    <span className={`inline-flex items-center rounded-full ring-1 ring-inset font-medium ${s.cls} ${size === "lg" ? "px-3 py-1 text-sm" : "px-2 py-0.5 text-xs"}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full ring-1 ring-inset font-semibold ${s.cls} ${size === "lg" ? "px-3 py-1 text-sm" : "px-2.5 py-0.5 text-xs uppercase tracking-wide"}`}>
       {s.label}
     </span>
   );
@@ -43,6 +43,6 @@ export function Field({ label, children, hint, required }: { label: string; chil
   );
 }
 
-export const inputCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-slate-900 sm:text-sm focus:ring-2 focus:ring-slate-200";
-export const btnPrimary = "inline-flex items-center justify-center rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 sm:py-2";
-export const btnSecondary = "inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50 sm:py-2";
+export const inputCls = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base outline-none focus:border-[#1890ff] sm:text-sm focus:ring-2 focus:ring-indigo-100";
+export const btnPrimary = "inline-flex items-center justify-center rounded-lg bg-[#1890ff] px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-[#40a9ff] disabled:opacity-50 sm:py-2";
+export const btnSecondary = "inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-800 hover:bg-slate-50 disabled:opacity-50 sm:py-2";

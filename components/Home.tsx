@@ -4,18 +4,22 @@ import { useEffect, useState } from "react";
 import { reminderMessage } from "@/lib/engine/message";
 import { effectiveStatus, homeLine, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
+import { Icon, type IconName } from "./icons";
 import { StatusBadge } from "./ui";
 
-function Tile({ href, label, short, count, cls }: { href: string; label: string; short: string; count: number | null; cls: string }) {
+function Tile({ href, label, short, count, icon, tint }: { href: string; label: string; short: string; count: number | null; icon: IconName; tint: string }) {
   return (
-    <Link href={href} className={`rounded-2xl border bg-white/80 p-3 backdrop-blur transition hover:bg-white sm:p-5 ${cls}`}>
-      <div className="text-xs font-medium sm:text-sm"><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span></div>
-      <div className="mt-1 text-3xl font-semibold tabular-nums sm:mt-2 sm:text-4xl">{count ?? "–"}</div>
+    <Link href={href} className="flex items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white p-3 shadow-[0_20px_27px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 sm:p-5">
+      <div>
+        <div className="text-xs font-semibold text-slate-500 sm:text-sm"><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span></div>
+        <div className="mt-1 text-2xl font-bold tabular-nums tracking-tight sm:text-3xl">{count ?? "–"}</div>
+      </div>
+      <span className={`hidden h-12 w-12 shrink-0 place-items-center rounded-lg text-white sm:grid ${tint}`}><Icon name={icon} className="h-6 w-6" /></span>
     </Link>
   );
 }
 
-const rowBtn = "hidden rounded-full border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-800 hover:bg-slate-50 sm:inline-flex";
+const rowBtn = "hidden rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-800 hover:bg-slate-50 sm:inline-flex";
 
 export default function Home({ firstName }: { firstName: string }) {
   const data = useRuns();
@@ -34,28 +38,25 @@ export default function Home({ firstName }: { firstName: string }) {
   const line = latest ? homeLine(review.length, waits.length, staleWaits) : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="hero-gradient rounded-3xl p-4 sm:p-8">
-      <div className="flex flex-col gap-1">
-        <div className="label text-slate-600">Vendor onboarding</div>
-        <h1 className="text-3xl font-medium tracking-tight sm:text-5xl">{hello}{firstName ? `, ${firstName}` : ""}</h1>
-        {line && <p className={`text-sm sm:text-base ${{ alert: "font-medium text-orange-800", warn: "font-medium text-amber-800", calm: "text-slate-700" }[line.tone]}`}>{line.text}</p>}
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{hello}{firstName ? `, ${firstName}` : ""}</h1>
+        {line && <p className={`mt-1 text-sm sm:text-base ${{ alert: "font-semibold text-orange-700", warn: "font-semibold text-amber-700", calm: "text-slate-500" }[line.tone]}`}>{line.text}</p>}
       </div>
-      <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-3">
-        <Tile href="/vendors?filter=review" label="Needs your review" short="Review" count={latest ? review.length : null} cls="border-orange-200 bg-orange-50 text-orange-900" />
-        <Tile href="/vendors?filter=PENDING_INFO" label="Waiting on vendor" short="Waiting" count={latest ? waits.length : null} cls="border-amber-200 bg-amber-50 text-amber-900" />
-        <Tile href="/vendors?filter=APPROVED" label="Approved this week" short="Approved" count={latest ? approved.length : null} cls="border-emerald-200 bg-emerald-50 text-emerald-900" />
-      </div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Tile href="/vendors?filter=review" label="Needs your review" short="Review" count={latest ? review.length : null} icon="alert" tint="bg-orange-500" />
+        <Tile href="/vendors?filter=PENDING_INFO" label="Waiting on vendor" short="Waiting" count={latest ? waits.length : null} icon="clock" tint="bg-amber-500" />
+        <Tile href="/vendors?filter=APPROVED" label="Approved this week" short="Approved" count={latest ? approved.length : null} icon="check" tint="bg-emerald-500" />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white">
-        <div className="label border-b border-slate-100 px-5 py-3 font-medium text-slate-500">Needs action</div>
+      <div className="rounded-xl border border-slate-100 bg-white shadow-[0_20px_27px_rgba(0,0,0,0.05)]">
+        <div className="border-b border-slate-100 px-5 py-4"><div className="font-bold">Needs action</div><div className="text-sm text-slate-500">Vendors that are waiting for you or for the vendor</div></div>
         {!latest ? (
           <div className="space-y-3 p-5">{[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-md bg-slate-100" />)}</div>
         ) : todo.length === 0 ? (
           <div className="p-10 text-center">
             <p className="text-slate-600">Nothing needs you right now.</p>
-            <Link href="/new" className="mt-4 inline-flex rounded-full bg-black px-5 py-2 text-sm font-medium text-white hover:bg-slate-800">Add a new vendor</Link>
+            <Link href="/new" className="mt-4 inline-flex rounded-lg bg-[#1890ff] px-5 py-2.5 text-xs font-semibold uppercase tracking-wide text-white hover:bg-[#40a9ff]">Add a new vendor</Link>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
@@ -65,8 +66,8 @@ export default function Home({ firstName }: { firstName: string }) {
                 <li key={r.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
                   <Link href={`/runs/${r.id}`} className="flex min-w-0 flex-1 items-center gap-4">
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-slate-900">{r.legal_name || "Unnamed vendor"}</div>
-                      <div className="truncate text-sm text-slate-500">{r.headline}</div>
+                      <div className="font-semibold text-slate-900 sm:truncate">{r.legal_name || "Unnamed vendor"}</div>
+                      <div className="text-sm text-slate-500 sm:truncate">{r.headline}</div>
                     </div>
                     <div className={`hidden text-xs sm:block ${stale ? "font-medium text-amber-700" : "text-slate-400"}`}>{waiting(r.started_at)}</div>
                     <StatusBadge status={effectiveStatus(r)} />

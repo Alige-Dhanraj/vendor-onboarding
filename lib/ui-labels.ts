@@ -21,11 +21,11 @@ export const LAYER_LABEL: Record<string, string> = {
 };
 
 export const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
-  APPROVED: { label: "Approved", cls: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
-  PENDING_INFO: { label: "Waiting on vendor", cls: "bg-amber-50 text-amber-800 ring-amber-200" },
-  MANUAL_REVIEW: { label: "Needs review", cls: "bg-orange-50 text-orange-800 ring-orange-200" },
-  REJECTED: { label: "Rejected", cls: "bg-rose-50 text-rose-800 ring-rose-200" },
-  INACTIVE: { label: "Inactive", cls: "bg-slate-100 text-slate-500 ring-slate-200" },
+  APPROVED: { label: "Approved", cls: "bg-emerald-600 text-white ring-emerald-600" },
+  PENDING_INFO: { label: "Waiting on vendor", cls: "bg-amber-400 text-amber-950 ring-amber-400" },
+  MANUAL_REVIEW: { label: "Needs review", cls: "bg-orange-600 text-white ring-orange-600" },
+  REJECTED: { label: "Rejected", cls: "bg-rose-600 text-white ring-rose-600" },
+  INACTIVE: { label: "Inactive", cls: "bg-slate-500 text-white ring-slate-500" },
   RUNNING: { label: "Checking…", cls: "bg-slate-100 text-slate-700 ring-slate-200" },
   FAILED: { label: "Check failed", cls: "bg-rose-50 text-rose-800 ring-rose-200" },
 };

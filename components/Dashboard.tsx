@@ -3,14 +3,18 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { effectiveStatus, fmtMs, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
+import { Icon, type IconName } from "./icons";
 import { Card, SectionTitle, StatusBadge, inputCls } from "./ui";
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Kpi({ label, value, sub, icon, hero }: { label: string; value: string; sub?: string; icon: IconName; hero?: boolean }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="label text-slate-500">{label}</div>
-      <div className="mt-2 text-3xl font-medium tabular-nums tracking-tight sm:text-4xl">{value}</div>
-      {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+    <div className={`flex items-center justify-between gap-2 rounded-xl p-4 shadow-[0_20px_27px_rgba(0,0,0,0.05)] sm:p-5 ${hero ? "bg-gradient-to-br from-[#0050e6] via-[#1890ff] to-[#8c7cf0] text-white" : "border border-slate-100 bg-white"}`}>
+      <div className="min-w-0">
+        <div className={`text-xs font-semibold sm:text-sm ${hero ? "text-white/85" : "text-slate-500"}`}>{label}</div>
+        <div className="mt-1 text-3xl font-bold tabular-nums tracking-tight">{value}</div>
+        {sub && <div className={`mt-1 text-xs ${hero ? "text-white/80" : "text-slate-500"}`}>{sub}</div>}
+      </div>
+      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${hero ? "bg-white/20 text-white" : "bg-[#1890ff] text-white"}`}><Icon name={icon} className="h-5 w-5" /></span>
     </div>
   );
 }
@@ -47,18 +51,17 @@ export default function Dashboard() {
   const stuck = [...review, ...waits].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()).slice(0, 6);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       <div>
-        <div className="label text-slate-500">For managers</div>
-        <h1 className="text-3xl font-medium tracking-tight sm:text-4xl">Dashboard</h1>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-600">How much time this saves, and where vendors are stuck.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Vendors checked" value={String(latest.length)} sub={`${s.total} checks in all`} />
-        <Kpi label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="No human needed" />
-        <Kpi label="Average check time" value={fmtMs(s.avg_ms) || "–"} sub="From upload to decision" />
-        <Kpi label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `${n} checks`} />
+        <Kpi label="Vendors checked" value={String(latest.length)} sub={`${s.total} checks in all`} icon="vendors" />
+        <Kpi label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="No human needed" icon="check" />
+        <Kpi label="Average check time" value={fmtMs(s.avg_ms) || "–"} sub="From upload to decision" icon="clock" />
+        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `${n} checks`} icon="bolt" />
       </div>
 
       <Card className="p-4 sm:p-5">
@@ -89,7 +92,7 @@ export default function Dashboard() {
             <ul className="divide-y divide-slate-100">
               {stuck.map((r) => (
                 <li key={r.id}>
-                  <Link href={`/runs/${r.id}`} className="flex items-start gap-3 py-3 hover:bg-slate-50">
+                  <Link href={`/runs/${r.id}`} className="flex flex-col items-start gap-2 py-3 hover:bg-slate-50 sm:flex-row sm:gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{r.legal_name || "Unnamed vendor"}</div>
                       <div className="text-sm text-slate-600">{r.headline}</div>
@@ -110,7 +113,7 @@ export default function Dashboard() {
               {issues.map((i) => (
                 <li key={i.check_id}>
                   <div className="flex items-baseline justify-between gap-3 text-sm"><span className="text-slate-800">{i.title}</span><b className="tabular-nums">{i.runs}</b></div>
-                  <div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-black" style={{ width: `${(i.runs / maxIssue) * 100}%` }} /></div>
+                  <div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-2 rounded-full bg-[#1890ff]" style={{ width: `${(i.runs / maxIssue) * 100}%` }} /></div>
                 </li>
               ))}
             </ul>
