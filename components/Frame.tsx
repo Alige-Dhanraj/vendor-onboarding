@@ -46,6 +46,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
   const bellRef = useRef<HTMLDivElement>(null);
   const [bell, setBell] = useState(false);
   const [seen, setSeen] = useState<string[]>([]);
+  useEffect(() => { try { if (!sessionStorage.getItem("vg_help_shown")) { sessionStorage.setItem("vg_help_shown", "1"); setHelp(true); } } catch { /* ignore */ } }, []);
   useEffect(() => { try { setSeen(JSON.parse(localStorage.getItem("vg_seen_runs") || "[]")); } catch { /* ignore */ } }, []);
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -89,12 +90,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
         <div className="border-t border-slate-200 pt-3" />
         {nav.map(([h, l, i]) => item(h, l, i))}
         {user.role === "ADMIN" && (<><div className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Admin</div>{item("/settings", "Settings", "gear")}</>)}
-        <div className="mt-auto rounded-xl bg-gradient-to-br from-[#0050e6] to-[#1890ff] p-4 text-white">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-white text-[#1890ff]"><Icon name="shield" /></span>
-          <div className="mt-3 font-semibold">Need help?</div>
-          <p className="mt-1 text-sm text-white/85">See how every vendor is checked.</p>
-          <button onClick={() => setHelp(true)} className="mt-3 w-full rounded-lg bg-white py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-800 hover:bg-slate-100">How it works</button>
-        </div>
+        <button onClick={() => setHelp(true)} className="mt-auto flex items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-500 hover:bg-white hover:text-slate-800"><Icon name="help" className="h-4 w-4" />How it works</button>
       </aside>
 
       <div className="lg:pl-[272px]">
@@ -141,7 +137,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
                   <button onClick={() => { setMenu(false); setHelp(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100"><Icon name="help" className="h-4 w-4" />How it works</button>
                   <div className="my-1 border-y border-slate-100 px-3 py-3"><div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Demo: view the app as</div><RoleSwitch compact /></div>
                   {user.role === "ADMIN" && <Link href="/settings" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100"><Icon name="gear" className="h-4 w-4" />Settings</Link>}
-                  <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100" onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }}><Icon name="logout" className="h-4 w-4" />Sign out</button>
+                  <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-100" onClick={async () => { try { sessionStorage.removeItem("vg_help_shown"); } catch { /* ignore */ } await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }}><Icon name="logout" className="h-4 w-4" />Sign out</button>
                 </div>
               )}
             </div>
