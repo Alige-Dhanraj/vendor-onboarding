@@ -18,6 +18,21 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [forgot, setForgot] = useState(false);
+  const [fLogin, setFLogin] = useState("");
+  const [fBusy, setFBusy] = useState(false);
+  const [fError, setFError] = useState<string | null>(null);
+  const [sent, setSent] = useState<{ to: string; text: string } | null>(null);
+
+  async function sendDetails(e: React.FormEvent) {
+    e.preventDefault();
+    setFBusy(true); setFError(null); setSent(null);
+    const res = await fetch("/api/auth/forgot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ login: fLogin }) });
+    const json = await res.json().catch(() => ({}));
+    setFBusy(false);
+    if (!res.ok) { setFError(json.error ?? "Could not send."); return; }
+    setSent({ to: json.to, text: json.text });
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,13 +54,32 @@ function LoginForm() {
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <Field label="Login ID, email or mobile number" required><input className={inputCls} type="text" placeholder="vendor" autoCapitalize="none" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
             <div>
-              <div className="mb-1 flex items-center justify-between"><span className="text-xs font-medium text-slate-600">Password<span className="ml-0.5 text-rose-600">*</span></span><button type="button" onClick={() => setNote("Password reset is not connected in this demo. The demo password is 12345.")} className="-my-2 py-2 text-xs font-semibold text-[#1890ff] hover:underline">Forgot password?</button></div>
+              <div className="mb-1 flex items-center justify-between"><span className="text-xs font-medium text-slate-600">Password<span className="ml-0.5 text-rose-600">*</span></span><button type="button" onClick={() => { setForgot(true); setSent(null); setFError(null); }} className="-my-2 py-2 text-xs font-semibold text-[#1890ff] hover:underline">Forgot password?</button></div>
               <input className={inputCls} type="password" autoComplete="current-password" placeholder="12345" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             {note && <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{note}</p>}
             <button type="submit" className={`${btnPrimary} w-full py-3`} disabled={busy || !email || !password}>{busy ? "Signing in…" : "Sign in"}</button>
           </form>
+          {forgot && (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" onClick={() => setForgot(false)} role="dialog" aria-modal="true" aria-label="Forgot password">
+              <form onSubmit={sendDetails} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+                <div className="text-base font-semibold text-slate-900">Forgot your password?</div>
+                <p className="mt-1 text-sm text-slate-500">Enter your mobile number and we will send your login details to it.</p>
+                <input className={`${inputCls} mt-4`} type="tel" inputMode="tel" autoFocus placeholder="Mobile number, e.g. 98765 43210" value={fLogin} onChange={(e) => setFLogin(e.target.value)} />
+                {fError && <p role="alert" className="mt-2 text-sm text-rose-700">{fError}</p>}
+                {sent && (
+                  <div className="mt-4">
+                    <div className="text-xs font-semibold text-emerald-700">✓ Message sent to {sent.to}</div>
+                    <div className="mt-2 rounded-2xl rounded-tl-sm bg-emerald-50 px-4 py-3 text-sm text-slate-800 ring-1 ring-emerald-200">{sent.text}</div>
+                    <p className="mt-2 text-xs text-slate-500">Demo: no SMS or WhatsApp service is connected, so the message is shown here. In a live system it would arrive on the phone, as a one-time code rather than the password.</p>
+                  </div>
+                )}
+                <button type="submit" className={`${btnPrimary} mt-4 w-full py-3`} disabled={fBusy || !fLogin.trim()}>{fBusy ? "Sending…" : sent ? "Send again" : "Send my login details"}</button>
+                <button type="button" className="mt-1 w-full py-3 text-sm text-slate-500 hover:text-slate-800" onClick={() => setForgot(false)}>Close</button>
+              </form>
+            </div>
+          )}
           <div className="mt-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {["Google", "Apple", "Microsoft"].map((n) => <button key={n} type="button" onClick={() => setNote(`Sign-in with ${n} is not connected in this demo. Use the demo login below.`)} className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{n}</button>)}

@@ -14,7 +14,7 @@ export const ACCOUNTS: Account[] = [
 ];
 
 /** Demo password, accepted for every account. DEMO_PASSWORD (if set) is accepted too. Replace before real use. */
-const DEMO_PASSWORD_PLAIN = "12345";
+export const DEMO_PASSWORD_PLAIN = "12345";
 
 function demoPassword(): string | null {
   const p = process.env.DEMO_PASSWORD;
