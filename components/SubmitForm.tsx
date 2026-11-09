@@ -70,6 +70,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
   const [scenarioId, setScenarioId] = useState("");
   const [demoOpen, setDemoOpen] = useState(false);
+  const [phoneDone, setPhoneDone] = useState<Record<string, boolean>>({});
   const [vendorRef, setVendorRef] = useState("");
   const [version, setVersion] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
@@ -237,6 +238,8 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
   const hl = (path: string) => (aiFilled.has(path) ? " ring-2 ring-indigo-200 bg-indigo-50/40" : "");
   const input = (path: string, value: string, o: { mono?: boolean; upper?: boolean; disabled?: boolean; placeholder?: string } = {}) => (
     <input className={`${inputCls}${hl(path)} ${o.mono ? "mono" : ""}`} value={value} disabled={o.disabled} placeholder={o.placeholder}
+      onFocus={() => path.startsWith("contact.") && setPhoneDone((p) => ({ ...p, [path]: false }))}
+      onBlur={() => path.startsWith("contact.") && setPhoneDone((p) => ({ ...p, [path]: true }))}
       onChange={(e) => set(path, o.upper ? e.target.value.toUpperCase() : e.target.value)} />
   );
   const gst = form.tax.gst_registered !== false;
@@ -362,8 +365,8 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Contact name" required>{input("contact.name", form.contact.name)}</Field>
             <Field label="Email" required>{input("contact.email", form.contact.email)}</Field>
-            <Field label="Phone" required error={phoneProblem(form.contact.phone, form.country)}>{input("contact.phone", form.contact.phone)}</Field>
-            <Field label="Alternate mobile (optional)" error={phoneProblem(form.contact.alt_phone ?? "", form.country)}>{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
+            <Field label="Phone" required error={phoneDone["contact.phone"] ? phoneProblem(form.contact.phone, form.country) : null}>{input("contact.phone", form.contact.phone)}</Field>
+            <Field label="Alternate mobile (optional)" error={phoneDone["contact.alt_phone"] ? phoneProblem(form.contact.alt_phone ?? "", form.country) : null}>{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
           </div>
           <details className="mt-3 text-sm">
             <summary className="-my-2 cursor-pointer py-2 font-medium text-indigo-700">Paste an email signature to fill the contact</summary>
