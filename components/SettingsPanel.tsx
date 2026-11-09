@@ -1,18 +1,27 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
-import { Card, SectionTitle, btnSecondary } from "./ui";
+import { useEffect, useState } from "react";
+import { Card, SectionTitle, btnSecondary, inputCls } from "./ui";
 
 export default function SettingsPanel({ users, accountingHost }: { users: { name: string; email: string; role: string }[]; accountingHost: string | null }) {
   const [msg, setMsg] = useState<string | null>(null);
+  const [manual, setManual] = useState("15");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { try { setManual(localStorage.getItem("vg_manual_minutes") ?? "15"); } catch { /* ignore */ } }, []);
+  const saveManual = (v: string) => { const c = v.replace(/[^\d.]/g, ""); setManual(c); setSaved(false); try { localStorage.setItem("vg_manual_minutes", c); setSaved(true); } catch { /* ignore */ } };
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
 
       <Card className="p-5">
-        <SectionTitle>Numbers for managers</SectionTitle>
-        <p className="text-sm text-slate-600">Time saved, vendors stuck and why now live on one page.</p>
-        <Link href="/dashboard" className={`${btnSecondary} mt-3`}>Open the dashboard</Link>
+        <SectionTitle>Dashboard assumptions</SectionTitle>
+        <p className="text-sm text-slate-600">The dashboard estimates time saved from how long one vendor check takes by hand. Set that baseline here.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <label htmlFor="manual-min" className="text-slate-700">Minutes per manual vendor check</label>
+          <input id="manual-min" className={`${inputCls} !w-24`} inputMode="numeric" value={manual} onChange={(e) => saveManual(e.target.value)} />
+          {saved && <span className="text-emerald-700">Saved</span>}
+        </div>
+        <Link href="/dashboard" className={`${btnSecondary} mt-4`}>Open the dashboard</Link>
       </Card>
 
       <Card className="p-5">

@@ -1,10 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { effectiveStatus, fmtMs, waiting } from "@/lib/ui-labels";
+import { ago, effectiveStatus, fmtMs, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { Icon, type IconName } from "./icons";
-import { Card, SectionTitle, StatusBadge, inputCls } from "./ui";
+import { Card, SectionTitle, StatusBadge } from "./ui";
 
 function Kpi({ label, value, sub, icon, hero }: { label: string; value: string; sub?: string; icon: IconName; hero?: boolean }) {
   return (
@@ -23,7 +23,6 @@ export default function Dashboard() {
   const data = useRuns(8000);
   const [manual, setManual] = useState("15"); // starting assumption: 15 minutes per manual check, editable
   useEffect(() => { try { setManual(localStorage.getItem("vg_manual_minutes") ?? "15"); } catch { /* ignore */ } }, []);
-  const save = (v: string) => { setManual(v); try { localStorage.setItem("vg_manual_minutes", v); } catch { /* ignore */ } };
 
   if (!data) {
     return <div className="mx-auto max-w-5xl space-y-4">{[0, 1, 2].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />)}</div>;
@@ -53,26 +52,20 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600">How much time this saves, and where vendors are stuck.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-600">Vendor onboarding at a glance: volume, speed, and what needs attention. Updated live.</p>
+        </div>
+        <a href="/api/vendors/export" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-800 hover:bg-slate-50">Export approved vendors (CSV)</a>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi label="Vendors checked" value={String(latest.length)} sub={`${s.total} checks in all`} icon="vendors" />
-        <Kpi label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="No human needed" icon="check" />
-        <Kpi label="Average check time" value={fmtMs(s.avg_ms) || "–"} sub="From upload to decision" icon="clock" />
-        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `Estimate: ${manual} min per manual check, ${vendorsN} vendors`} icon="bolt" />
+        <Kpi hero label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="Straight-through rate" icon="check" />
+        <Kpi label="Average decision time" value={fmtMs(s.avg_ms) || "–"} sub="Upload to decision" icon="clock" />
+        <Kpi label="Estimated time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={`Baseline: ${manual} min per manual check`} icon="bolt" />
       </div>
-
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label htmlFor="manual-min" className="text-slate-700">One manual check takes about</label>
-          <input id="manual-min" className={`${inputCls} !w-20`} inputMode="numeric" value={manual} onChange={(e) => save(e.target.value.replace(/[^\d.]/g, ""))} placeholder="min" />
-          <span className="text-slate-700">minutes (you time it once)</span>
-          {saved !== null && <span className="text-slate-500">Time saved = (manual time − {fmtMs(s.avg_ms)}) × {vendorsN} vendors (an estimate).</span>}
-        </div>
-      </Card>
 
       <Card className="p-4 sm:p-5">
         <SectionTitle hint={`${latest.length} vendors`}>Where vendors are now</SectionTitle>
@@ -121,6 +114,25 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
+      <Card className="p-4 sm:p-5">
+        <SectionTitle hint="Latest checks">Recent activity</SectionTitle>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500"><th className="py-2 pr-3 font-semibold">Vendor</th><th className="py-2 pr-3 font-semibold">Status</th><th className="hidden py-2 pr-3 font-semibold md:table-cell">Outcome</th><th className="hidden py-2 pr-3 font-semibold sm:table-cell">Checked in</th><th className="py-2 text-right font-semibold">When</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {done.slice(0, 8).map((r: any) => (
+                <tr key={r.id} className="hover:bg-slate-50">
+                  <td className="py-2.5 pr-3"><Link href={`/runs/${r.id}`} className="font-medium text-slate-900 hover:underline">{r.legal_name || "Unnamed vendor"}</Link></td>
+                  <td className="py-2.5 pr-3"><StatusBadge status={effectiveStatus(r)} /></td>
+                  <td className="hidden max-w-xs truncate py-2.5 pr-3 text-slate-600 md:table-cell">{r.headline}</td>
+                  <td className="hidden py-2.5 pr-3 tabular-nums text-slate-600 sm:table-cell">{fmtMs(r.duration_ms) || "–"}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right text-slate-500">{ago(r.started_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
