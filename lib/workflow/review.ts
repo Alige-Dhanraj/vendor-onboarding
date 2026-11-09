@@ -40,8 +40,8 @@ export async function reviewRun(store: Store, args: { runId: string; action: "AP
   await store.updateRun(run.id, { review_resolved: true, final_status: "PENDING_INFO", headline: `Reviewer asked the vendor for more: ${reason}` });
   const hi = (form.contact.name || "").trim().split(/\s+/)[0] || "there";
   await save({
-    subject: `${form.legal_name || "Your registration"}: 1 item needed`,
-    body: `Hi ${hi},\n\nTo finish your registration, please send:\n\n1. ${reason}\n\nJust reply to this email. Thank you!`,
+    subject: `${form.legal_name || "Your application"}: 1 item needed to complete your vendor onboarding`,
+    body: `Hi ${hi},\n\nThank you for applying to become a vendor with us. To complete your onboarding, please send:\n\n1. ${reason}\n\nJust reply to this email with it attached. Thank you!`,
     analyst_summary: `Reviewer requested information: ${reason}`,
   });
   return { action };

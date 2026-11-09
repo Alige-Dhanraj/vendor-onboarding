@@ -45,23 +45,23 @@ export function templateMessage(form: SubmissionForm, decision: Decision, result
   if (decision.internal_status === "REJECTED") {
     const why = lines(results.filter((r) => r.status === "FAIL" && r.severity === "HARD_STOP"));
     return {
-      subject: `Registration not approved: ${company}`,
-      body: `${hi}\n\nWe can't approve your registration.\n\n${numbered(why.length ? why : ["We can't proceed with this registration."])}\n\n${FOOT}`,
+      subject: `Vendor application not approved: ${company}`,
+      body: `${hi}\n\nThank you for applying. We are unable to onboard you as a vendor at this time.\n\n${numbered(why.length ? why : ["We can't proceed with this application."])}\n\n${FOOT}`,
       analyst_summary: `Rejected (${checks || "reviewer"}). ${decision.headline}`,
     };
   }
   if (decision.internal_status === "MANUAL_REVIEW") {
     const extra = fixes.length ? `\n\nPlease also fix:\n${numbered(fixes)}` : "";
     return {
-      subject: `Registration under review: ${company}`,
-      body: `${hi}\n\nWe're reviewing your registration and may contact you.${extra}\n\n${FOOT}`,
+      subject: `Vendor application under review: ${company}`,
+      body: `${hi}\n\nWe're reviewing your vendor application and may contact you.${extra}\n\n${FOOT}`,
       analyst_summary: `Manual review (${checks}). ${decision.headline}`,
     };
   }
   const list = fixes.length ? fixes : ["**Documents**: please resend clear copies"];
   return {
-    subject: `${company}: ${list.length} item${list.length === 1 ? "" : "s"} needed`,
-    body: `${hi}\n\nTo finish your registration, please fix:\n\n${numbered(list)}\n\nJust reply to this email with the fixes. Thank you!`,
+    subject: `${company}: ${list.length} item${list.length === 1 ? "" : "s"} needed to complete your vendor onboarding`,
+    body: `${hi}\n\nThank you for applying to become a vendor with us. To complete your onboarding, please fix the following:\n\n${numbered(list)}\n\nJust reply to this email with the corrected details or documents attached. Thank you!`,
     analyst_summary: `Pending vendor action on ${checks}.`,
   };
 }
@@ -69,16 +69,16 @@ export function templateMessage(form: SubmissionForm, decision: Decision, result
 /** Short email asking a vendor for the documents we need. */
 export function requestDocumentsMessage(contactName: string, docLabels: string[]) {
   return {
-    subject: "Documents needed for your registration",
-    body: `Hi ${firstName(contactName)},\n\nTo register you as a vendor, please reply with:\n\n${numbered(docLabels.map((l) => `**${l}**`))}\n\nThank you!`,
+    subject: "Documents needed to onboard you as a vendor",
+    body: `Hi ${firstName(contactName)},\n\nTo onboard you as a vendor, please reply with:\n\n${numbered(docLabels.map((l) => `**${l}**`))}\n\nThank you!`,
   };
 }
 
 /** Short nudge for a vendor we are still waiting on. */
 export function reminderMessage(contactName: string) {
   return {
-    subject: "Reminder: your registration",
-    body: `Hi ${firstName(contactName)},\n\nA quick reminder: we're still waiting on the items in our earlier email.\n\nJust reply to this email. Thank you!`,
+    subject: "Reminder: your vendor onboarding",
+    body: `Hi ${firstName(contactName)},\n\nA quick reminder: we're still waiting on the items in our earlier email to complete your vendor onboarding.\n\nJust reply to this email with them attached. Thank you!`,
   };
 }
 

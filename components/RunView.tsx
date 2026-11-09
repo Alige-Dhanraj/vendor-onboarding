@@ -53,6 +53,19 @@ export default function RunView({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // A vendor waiting on corrections needs an upload link in the email. Create it once, quietly, if there is none yet.
+  const linkTried = useRef(false);
+  useEffect(() => {
+    if (!data || !role || linkTried.current || data.invite_token) return;
+    if (effectiveStatus(data.run) !== "PENDING_INFO" || data.run.status === "RUNNING") return;
+    const c = data.submission?.form_data?.contact;
+    if (!c?.email) return;
+    linkTried.current = true;
+    fetch("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_name: c.name || "Vendor", contact_email: c.email, vendor_ref: data.submission.vendor_ref }) })
+      .then((r) => (r.ok ? load() : null)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, role]);
+
   // Result popup: only when this page watched the check finish (not when reopening an old one).
   useEffect(() => {
     if (!data) return;
@@ -441,7 +454,7 @@ function RecordCard({ id, form, actions }: { id: string; form: any; actions: any
 function withLink(m: any, token?: string | null) {
   if (!m || !token || typeof window === "undefined") return m;
   const link = `${window.location.origin}/invite/${token}`;
-  return { ...m, body: String(m.body).replace(/Just reply to this email[^\n]*/, `Fix it here and send again: ${link}\n\nThank you!`) };
+  return { ...m, body: String(m.body).replace(/Just reply to this email[^\n]*/, `You can upload the corrected documents here: ${link}\n\nOr just reply to this email with them attached.\n\nThank you!`) };
 }
 
 const REASONS = ["Trade completed", "Duplicate vendor", "Fraud concern", "Other"];
