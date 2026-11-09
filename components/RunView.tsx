@@ -151,7 +151,7 @@ export default function RunView({ id }: { id: string }) {
           {checks.length > 0 && (problems.length > 0 ? (
             <section className="space-y-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What needs attention ({problems.length})</h2>
-              {problems.map((c, i) => <Problem key={c.id} c={c} documents={documents} defaultOpen={i === 0} />)}
+              {problems.map((c) => <Problem key={c.id} c={c} documents={documents} />)}
               <p className="text-sm text-slate-500">✓ {passed} other check{passed === 1 ? "" : "s"} passed or did not apply.</p>
             </section>
           ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">✓ All {checks.length} checks passed. Nothing needs attention.</p>)}
@@ -211,35 +211,35 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
   );
 }
 
-function Problem({ c, documents, defaultOpen }: { c: CheckResult; documents: any[]; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(!!defaultOpen);
+function Problem({ c, documents }: { c: CheckResult; documents: any[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(false);
   const tone = c.status === "FAIL"
     ? (c.severity === "HARD_STOP" ? "border-rose-200 bg-rose-50/50" : c.severity === "REVIEW" ? "border-orange-200 bg-orange-50/50" : "border-amber-200 bg-amber-50/50")
     : "border-slate-200 bg-slate-50";
+  const hasEvidence = c.sources.length > 1;
+  const next = (c.next_action ?? "").replace(/^Manual review:\s*/i, "").split(/ \(e\.g\./)[0].replace(/\.$/, "");
   return (
     <div className={`rounded-xl border p-4 ${tone}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="font-medium text-slate-900">{PLAIN[c.id] ?? c.title}</div>
-        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="-my-3 shrink-0 px-1 py-3 text-xs font-semibold text-[#1890ff] hover:underline">{open ? "Hide details" : "Show details"}</button>
-      </div>
-      <p className="mt-1 text-sm text-slate-700">{c.reason}</p>
-      {c.next_action && <p className="mt-2 text-sm text-slate-800"><b>Next:</b> {c.next_action}</p>}
-      {open && c.sources.length > 1 && (
+      <div className="font-semibold text-slate-900">{PLAIN[c.id] ?? c.title}</div>
+      {hasEvidence ? (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {c.sources.map((s, i) => (
             <div key={i} className="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
-              <div className="text-xs text-slate-500">{s.label}</div>
-              <div className="mono break-all text-sm text-slate-900">{s.value}</div>
+              <div className="text-xs text-slate-500">{s.label.replace(/\s*\(AI-read[^)]*\)/, "")}</div>
+              <div className="mono break-all text-sm font-medium text-slate-900">{s.value}</div>
               {(() => { const d = documents.find((x) => x.url && s.label.startsWith(SLOT_LABEL[x.slot] ?? "\u0000")); return d ? <a href={d.url} target="_blank" rel="noreferrer" className="mt-1 inline-block py-1 text-xs font-semibold text-[#1890ff] hover:underline">View document ↗</a> : null; })()}
             </div>
           ))}
         </div>
+      ) : <p className="mt-1 text-sm text-slate-700">{c.reason}</p>}
+      {next && <p className="mt-3 text-sm text-slate-800"><b>What to do:</b> {next}.</p>}
+      {hasEvidence && (
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="-mb-2 mt-1 py-3 text-xs font-semibold text-[#1890ff] hover:underline">{open ? "Hide explanation" : "Why was this flagged?"}</button>
       )}
-      {open && <div className="mt-3 space-y-1 border-t border-slate-200 pt-3 text-xs text-slate-600"><div><b>What we compared:</b> {c.checked}</div><div><b>Rule:</b> {c.rule}</div></div>}
+      {open && <div className="space-y-1 border-t border-slate-200 pt-3 text-xs text-slate-600"><div>{c.reason}</div><div><b>What we compared:</b> {c.checked}</div><div><b>Rule:</b> {c.rule}</div></div>}
     </div>
   );
 }
-
 function AllChecks({ checks }: { checks: CheckResult[] }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
