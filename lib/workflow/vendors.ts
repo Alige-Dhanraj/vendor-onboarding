@@ -1,6 +1,6 @@
 // Vendor lifecycle after approval: deactivate when the work is over, reactivate if it starts again.
 // Records are never deleted. Inactive vendors still count for the duplicate and bank-reuse checks.
-import { hashAccount } from "../engine/ids";
+import { clean, hashAccount } from "../engine/ids";
 import type { Store } from "../store/types";
 import { effectiveStatus } from "../ui-labels";
 
@@ -30,7 +30,7 @@ export async function changeVendorStatus(store: Store, args: { runId: string; ac
   await store.setVendorActive(args.runId, false, { reason: text, by: args.by });
   if (label === "Fraud concern") {
     await store.addBlocklist({
-      name: form.legal_name, pan: form.tax.pan?.toUpperCase(),
+      name: form.legal_name, pan: clean(form.tax.pan) || undefined,
       bank_account_hash: form.bank.account_number ? hashAccount(form.bank.account_number) : undefined,
       reason: `Added when the vendor was deactivated: ${text}`,
     });

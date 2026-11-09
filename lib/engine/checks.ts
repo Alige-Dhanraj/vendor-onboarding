@@ -230,7 +230,22 @@ function v6(ctx: CheckContext): CheckResult {
 function k1(ctx: CheckContext): CheckResult {
   const f = ctx.form;
   const b: Base = { id: "K1", layer: "CONSISTENT", title: "PAN inside GSTIN matches PAN", checked: "PAN embedded in the GSTIN (characters 3-12) vs the PAN given", rule: "K1: the PAN inside the GSTIN must equal the vendor's PAN. If the two official documents disagree, a person must review; if only the typed form differs, it is a fixable typo." };
-  if (!gstRegistered(ctx)) return result(b, "SKIPPED", null, { reason: "Vendor is not GST-registered." });
+  if (!gstRegistered(ctx)) {
+    // No GSTIN to compare, but the typed tax ID must still equal the one on the official document.
+    const us = !isIndia(ctx);
+    const b2: Base = { ...b, title: "Tax ID agrees with the document", checked: us ? "EIN on the form vs the IRS EIN notice" : "PAN on the form vs the PAN card", rule: "K1: the tax ID typed on the form must equal the one printed on the official document." };
+    const doc = us ? trusted(ctx, "EIN_NOTICE", "ein") : trusted(ctx, "PAN_CARD", "pan");
+    const typed = us ? f.tax.ein : f.tax.pan;
+    if (!doc || !typed) return result(b2, "SKIPPED", null, { reason: "No readable document or no typed tax ID to compare." });
+    const norm = (v: string) => (us ? v.replace(/\D/g, "") : clean(v));
+    const label = us ? "EIN" : "PAN";
+    if (norm(doc.value) === norm(typed)) return result(b2, "PASS", null, { sources: [formSrc(typed), doc.src], reason: `The ${label} on the form matches the document.` });
+    return result(b2, "FAIL", "FIXABLE", {
+      sources: [formSrc(typed), doc.src], reason: `The ${label} on the form (${typed}) is not the one on the document (${doc.value}).`,
+      next_action: `Ask the vendor to correct the typed ${label}, or to send the right document.`,
+      vendor_fix: `**${label}**: does not match your document, please correct it`,
+    });
+  }
   const gstDoc = trusted(ctx, "GST_CERTIFICATE", "gstin");
   const panDoc = trusted(ctx, "PAN_CARD", "pan");
   if (gstDoc && panDoc && gstinPan(gstDoc.value) !== clean(panDoc.value)) {
@@ -326,6 +341,13 @@ function k5(ctx: CheckContext): CheckResult {
     return result(b, "PASS", null, { sources, reason: why.length ? `Names refer to the same entity. ${why.join(" ")}` : "Names match." });
   }
   const desc = bad.map((x) => `${x.o.src.label.split(" (")[0]} says "${x.o.value}" (${x.j.verdict === "DIFFERENT" ? "different entity" : "unclear"}: ${noDot(x.j.reason)})`);
+  // The AI's doubt is not evidence against the vendor: unclear or AI-only "different" goes to a person, not back to the vendor.
+  if (bad.some((x) => x.j.verdict === "UNSURE" || (x.j.verdict === "DIFFERENT" && x.j.by === "AI"))) {
+    return result(b, "FAIL", "REVIEW", {
+      sources, reason: `The legal name may differ: ${desc.join("; ")}.`,
+      next_action: "Manual review: a reviewer compares the names and confirms whether they are the same entity.",
+    });
+  }
   return result(b, "FAIL", "FIXABLE", {
     sources, reason: `Legal name differs: ${desc.join("; ")}.`,
     next_action: "Ask the vendor to correct the legal name to match their registration documents.",
@@ -400,7 +422,18 @@ function r2(ctx: CheckContext): CheckResult {
   const f = ctx.form;
   const b: Base = { id: "R2", layer: "CREDIBLE", title: "Not a duplicate of an existing vendor", checked: "PAN and GSTIN against the vendor master", rule: "R2: the same PAN or GSTIN as an existing vendor is a confirmed duplicate (hard stop). A merely similar name is only a warning." };
   const pan = clean(f.tax.pan), gstin = clean(f.tax.gstin);
-  const dup = ctx.vendorMaster.find((v) => (pan && v.pan === pan) || (gstin && v.gstin === gstin));
+  const byGstin = gstin ? ctx.vendorMaster.find((v) => v.gstin === gstin) : undefined;
+  const byPan = pan ? ctx.vendorMaster.find((v) => v.pan === pan) : undefined;
+  // Same PAN but a different GSTIN is often a second state registration of the same company, not a copy.
+  const sibling = !byGstin && byPan && byPan.gstin && gstin && byPan.gstin !== gstin ? byPan : undefined;
+  if (sibling) {
+    return result(b, "FAIL", "REVIEW", {
+      sources: [formSrc(`PAN ${pan} · GSTIN ${gstin}`), { label: "Vendor master", value: `${sibling.legal_name} (${sibling.id}): PAN ${sibling.pan} · GSTIN ${sibling.gstin}` }],
+      reason: `This PAN is already registered to existing vendor "${sibling.legal_name}" (${sibling.id}) under a different GSTIN. It may be another state registration of the same company.`,
+      next_action: `Manual review: confirm it is the same company, then add the new GSTIN to ${sibling.id} instead of creating a second vendor.`,
+    });
+  }
+  const dup = byGstin ?? byPan;
   if (dup) {
     return result(b, "FAIL", "HARD_STOP", {
       sources: [formSrc(`PAN ${pan || "-"} · GSTIN ${gstin || "-"}`), { label: "Vendor master", value: `${dup.legal_name} (${dup.id}): PAN ${dup.pan ?? "-"} · GSTIN ${dup.gstin ?? "-"}` }],

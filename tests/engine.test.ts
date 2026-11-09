@@ -250,7 +250,7 @@ test("resubmission keeps documents the vendor did not replace", async () => {
   const { submit } = await import("../lib/workflow/intake");
   const store = createMemoryStore({ vendors: VENDOR_MASTER_SEED, blocklist: BLOCKLIST_SEED, registry: TEST_REGISTRY });
   const form = SCENARIOS[0].form;
-  const file = (slot: any, n: number) => ({ slot, name: `${slot}.pdf`, mime: "application/pdf", bytes: new Uint8Array([37, 80, 68, 70, n]) });
+  const file = (slot: any, n: number) => ({ slot, name: `${slot}.pdf`, mime: "application/pdf", bytes: new Uint8Array([37, 80, 68, 70, 45, n]) });
   const v1 = await submit(store, { form, vendorRef: "t1", files: [file("GST_CERTIFICATE", 1), file("PAN_CARD", 2), file("BANK_PROOF", 3)] });
   const v2 = await submit(store, { form, vendorRef: "t1", files: [file("PAN_CARD", 9)], keep: await store.listDocuments(v1.id) });
   assert.equal(v2.version, 2);
@@ -336,4 +336,43 @@ test("home line picks the most useful message", async () => {
   assert.match(homeLine(0, 4, 1).text, /^1 vendor has been waiting over 3 days/);
   assert.equal(homeLine(0, 2, 0).tone, "calm");
   assert.match(homeLine(0, 0, 0).text, /Nothing is stuck/);
+});
+
+test("review fixes: AI doubt about a name goes to a reviewer; PAN is checked for non-GST vendors; a second GSTIN is reviewed, not rejected", async () => {
+  const { runChecks } = await import("../lib/engine/checks");
+  const { pairKey } = await import("../lib/engine/names");
+  const base = SCENARIOS[0];
+  const mk = (form: typeof base.form, docs = base.docs, nj: CheckContext["nameJudgements"] = {}): CheckContext => ({
+    form, docs: docs.map((d) => ({ slot: d.slot, file_name: d.file_name, ...d.truth })), vendorMaster: VENDOR_MASTER_SEED,
+    blocklist: BLOCKLIST_SEED, registry: TEST_REGISTRY, nameJudgements: nj, confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD, today: "2026-11-09",
+  });
+  const get = (ctx: CheckContext, id: string) => runChecks(ctx).find((r) => r.id === id)!;
+
+  // K5: the AI says UNSURE (or AI-only DIFFERENT) -> REVIEW, never FIXABLE
+  const other = "Zenith Quartz Works Pvt Ltd";
+  const docs = base.docs.map((d) => (d.slot === "GST_CERTIFICATE" ? { ...d, truth: { ...d.truth, fields: { ...d.truth.fields, legal_name: other } } } : d));
+  for (const verdict of ["UNSURE", "DIFFERENT"] as const) {
+    const k5 = get(mk(base.form, docs, { [pairKey(base.form.legal_name, other)]: { verdict, reason: "test", by: "AI" } }), "K5");
+    assert.equal(k5.status, "FAIL"); assert.equal(k5.severity, "REVIEW", `${verdict} from the AI must reach a person`);
+  }
+
+  // K1: a non-GST vendor's typed PAN must equal the PAN card
+  const nonGst = { ...base.form, tax: { ...base.form.tax, gst_registered: false, gstin: undefined, pan: "AAAAA1111A" } };
+  const k1 = get(mk(nonGst), "K1");
+  assert.equal(k1.status, "FAIL"); assert.equal(k1.severity, "FIXABLE");
+
+  // R2: same GSTIN is a duplicate (hard stop); same PAN under a different GSTIN goes to a person
+  const seed = VENDOR_MASTER_SEED.find((v) => v.pan && v.gstin)!;
+  const sameGst = get(mk({ ...base.form, tax: { ...base.form.tax, pan: seed.pan!, gstin: seed.gstin! } }), "R2");
+  assert.equal(sameGst.severity, "HARD_STOP");
+  const sibling = get(mk({ ...base.form, tax: { ...base.form.tax, pan: seed.pan!, gstin: "27AAAAA0000A1Z5" } }), "R2");
+  assert.equal(sibling.severity, "REVIEW");
+});
+
+test("uploads are checked by their first bytes, not by the name or type the browser claims", async () => {
+  const { sniffMime } = await import("../lib/workflow/intake");
+  assert.equal(sniffMime(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31])), "application/pdf");
+  assert.equal(sniffMime(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), "image/png");
+  assert.equal(sniffMime(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), "image/jpeg");
+  assert.equal(sniffMime(new TextEncoder().encode("<html>not a pdf</html>")), null);
 });

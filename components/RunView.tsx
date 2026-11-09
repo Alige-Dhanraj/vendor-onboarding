@@ -103,6 +103,7 @@ export default function RunView({ id }: { id: string }) {
             <p className="mt-3 text-base font-medium text-slate-900">{run.headline}</p>
             <p className="mt-1 text-sm text-slate-600">{nextStep}</p>
             <div className="mt-4 flex flex-wrap gap-2">
+              {run.status === "FAILED" && <RetryButton id={run.id} />}
               {status === "APPROVED" && !inactive && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
               {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, withLink(message, data.invite_token))}>Send to vendor</a>}
               {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
@@ -482,4 +483,17 @@ function CorrectDocs({ token, vendorRef, name, email }: { token?: string | null;
     window.location.href = `/invite/${j.token}`;
   }
   return (<><button className={btnSecondary} onClick={go} disabled={busy}>{busy ? "Opening…" : "Add corrected documents"}</button>{err && <span className="text-sm text-rose-700">{err}</span>}</>);
+}
+
+function RetryButton({ id }: { id: string }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function go() {
+    setBusy(true); setErr(null);
+    const res = await fetch(`/api/runs/${id}/retry`, { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) { setErr(j.error ?? "Could not start the check again."); setBusy(false); return; }
+    window.location.href = `/runs/${j.run_id}`;
+  }
+  return (<><button className={btnPrimary} onClick={go} disabled={busy}>{busy ? "Starting…" : "Run the checks again"}</button>{err && <span className="text-sm text-rose-700">{err}</span>}</>);
 }

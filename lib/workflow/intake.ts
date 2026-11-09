@@ -14,6 +14,16 @@ export class IntakeError extends Error {}
 
 export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "vendor";
 
+/** Reads the first bytes, so a renamed file cannot pass as a PDF or image. */
+export function sniffMime(b: Uint8Array): string | null {
+  const at = (...xs: number[]) => xs.every((x, i) => b[i] === x);
+  if (at(0x25, 0x50, 0x44, 0x46, 0x2d)) return "application/pdf";
+  if (at(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
+  if (at(0xff, 0xd8, 0xff)) return "image/jpeg";
+  if (at(0x52, 0x49, 0x46, 0x46) && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return "image/webp";
+  return null;
+}
+
 export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
   if (!form || typeof form !== "object") throw new IntakeError("Missing form data.");
   if (files.length > MAX_FILES) throw new IntakeError(`At most ${MAX_FILES} files.`);
@@ -22,6 +32,9 @@ export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
     if (!ALLOWED_MIME.includes(f.mime)) throw new IntakeError(`${f.name}: only PDF, PNG, JPG or WEBP files are accepted.`);
     if (f.bytes.byteLength > MAX_FILE_BYTES) throw new IntakeError(`${f.name} is larger than 10 MB.`);
     if (f.bytes.byteLength === 0) throw new IntakeError(`${f.name} is empty.`);
+    const real = sniffMime(f.bytes);
+    if (!real) throw new IntakeError(`${f.name}: this is not a real PDF, PNG, JPG or WEBP file.`);
+    f.mime = real; // store the type we found, not the one the browser claimed
   }
   const slots = files.map((f) => f.slot);
   if (new Set(slots).size !== slots.length) throw new IntakeError("Upload one file per document slot.");
@@ -30,7 +43,8 @@ export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
 export async function submit(store: Store, args: { form: SubmissionForm; files: IncomingFile[]; scenarioId?: string | null; vendorRef?: string; keep?: DocumentRow[] }): Promise<SubmissionRow> {
   validateIncoming(args.form, args.files);
   const vendor_ref = args.vendorRef || args.form.vendor_ref || slug(args.form.legal_name);
-  const form = { ...args.form, vendor_ref };
+  const g = args.form as Partial<SubmissionForm>;
+  const form: SubmissionForm = { ...args.form, vendor_ref, address: { ...(g.address ?? {}) } as SubmissionForm["address"], contact: { ...(g.contact ?? {}) } as SubmissionForm["contact"], tax: { ...(g.tax ?? {}) }, bank: { ...(g.bank ?? {}) } as SubmissionForm["bank"] };
   const sub = await store.createSubmission({ vendor_ref, scenario_id: args.scenarioId ?? null, form });
   for (const f of args.files) {
     const path = `${vendor_ref}/v${sub.version}/${f.slot.toLowerCase()}-${slug(f.name.replace(/\.[^.]+$/, ""))}.${f.name.split(".").pop()?.toLowerCase() ?? "bin"}`;

@@ -319,6 +319,9 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
         <Card className="p-5">
           <SectionTitle>2 · Vendor details</SectionTitle>
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Country" required>
+              <select className={inputCls} value={form.country} onChange={(e) => set("country", e.target.value)}><option value="IN">India</option><option value="US">United States</option></select>
+            </Field>
             <Field label="Legal name" required>{input("legal_name", form.legal_name)}</Field>
             <Field label="Entity type" required>
               <select className={`${inputCls}${hl("entity_type")}`} value={form.entity_type} onChange={(e) => set("entity_type", e.target.value)}>
@@ -374,9 +377,6 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
             <summary className="-my-2 cursor-pointer py-2 font-medium text-slate-700">More (optional)</summary>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <Field label="Trade name">{input("trade_name", form.trade_name ?? "")}</Field>
-              <Field label="Country">
-                <select className={inputCls} value={form.country} onChange={(e) => set("country", e.target.value)}><option value="IN">India</option><option value="US">United States</option></select>
-              </Field>
               {!isUS && <Field label="GST registered?">
                 <select className={inputCls} value={gst ? "yes" : "no"} onChange={(e) => set("tax.gst_registered", e.target.value === "yes")}><option value="yes">Yes</option><option value="no">No (declaration instead)</option></select>
               </Field>}

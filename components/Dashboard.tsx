@@ -43,7 +43,8 @@ export default function Dashboard() {
 
   const m = Number(manual);
   const n = done.length;
-  const saved = m > 0 && n ? Math.max(0, ((m * 60000 - s.avg_ms) * n) / 3600000) : null;
+  const vendorsN = latest.length;
+  const saved = m > 0 && vendorsN ? Math.max(0, ((m * 60000 - s.avg_ms) * vendorsN) / 3600000) : null;
   const clear = n ? Math.round((s.auto_cleared / n) * 100) : null;
 
   const issues: { check_id: string; title: string; runs: number }[] = (data.issues ?? []).slice(0, 5);
@@ -61,7 +62,7 @@ export default function Dashboard() {
         <Kpi label="Vendors checked" value={String(latest.length)} sub={`${s.total} checks in all`} icon="vendors" />
         <Kpi label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="No human needed" icon="check" />
         <Kpi label="Average check time" value={fmtMs(s.avg_ms) || "–"} sub="From upload to decision" icon="clock" />
-        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `${n} checks`} icon="bolt" />
+        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `Estimate, ${vendorsN} vendors`} icon="bolt" />
       </div>
 
       <Card className="p-4 sm:p-5">
@@ -69,7 +70,7 @@ export default function Dashboard() {
           <label htmlFor="manual-min" className="text-slate-700">One manual check takes about</label>
           <input id="manual-min" className={`${inputCls} !w-20`} inputMode="numeric" value={manual} onChange={(e) => save(e.target.value.replace(/[^\d.]/g, ""))} placeholder="min" />
           <span className="text-slate-700">minutes (you time it once)</span>
-          {saved !== null && <span className="text-slate-500">Time saved = (manual time − {fmtMs(s.avg_ms)}) × {n} checks.</span>}
+          {saved !== null && <span className="text-slate-500">Time saved = (manual time − {fmtMs(s.avg_ms)}) × {vendorsN} vendors (an estimate).</span>}
         </div>
       </Card>
 
