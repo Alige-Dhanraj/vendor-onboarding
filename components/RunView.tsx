@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CheckResult } from "@/lib/engine/types";
-import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtDateTime, fmtMs, mailtoLink, plainText } from "@/lib/ui-labels";
+import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtDateTime, fmtMs, plainText } from "@/lib/ui-labels";
 import SendVia from "./SendVia";
 import { Card, CheckBadge, Pill, SectionTitle, StatusBadge, btnPrimary, btnSecondary, inputCls } from "./ui";
 
@@ -124,9 +124,9 @@ export default function RunView({ id }: { id: string }) {
             <p className="mt-1 text-sm text-slate-600">{nextStep}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               {run.status === "FAILED" && <RetryButton id={run.id} />}
-              {status === "APPROVED" && !inactive && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
+              {status === "APPROVED" && !inactive && message && <SendVia label="Send approval note" vendor={form.legal_name} email={email} phone={form.contact?.phone} message={message} className={btnPrimary} />}
               {status === "PENDING_INFO" && message && <SendVia label="Send to vendor" vendor={form.legal_name} email={email} phone={form.contact?.phone} message={withLink(message, data.invite_token)} className={btnPrimary} />}
-              {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
+              {status === "REJECTED" && message && <SendVia label="Send notice" vendor={form.legal_name} email={email} phone={form.contact?.phone} message={message} className={btnPrimary} />}
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
               {status === "PENDING_INFO" && (submission.scenario_id ? <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link> : <CorrectDocs token={data.invite_token} vendorRef={submission.vendor_ref} name={form.contact?.name} email={form.contact?.email} />)}
               {status === "APPROVED" && !inactive && <Link className={btnSecondary} href="/new">Next vendor</Link>}
@@ -182,7 +182,7 @@ export default function RunView({ id }: { id: string }) {
           {message && (
             <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">{status === "MANUAL_REVIEW" ? "Holding note to the vendor (optional)" : "Preview the email to the vendor"}</summary>
-              <div className="px-5 pb-5"><MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} holding={status === "MANUAL_REVIEW"} /></div>
+              <div className="px-5 pb-5"><MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} phone={form.contact?.phone} vendor={form.legal_name} holding={status === "MANUAL_REVIEW"} /></div>
             </details>
           )}
         </div>
@@ -360,7 +360,7 @@ function Documents({ documents, running }: { documents: any[]; running: boolean 
   );
 }
 
-function MessageCard({ message, email, holding }: { message: any; email?: string; holding?: boolean }) {
+function MessageCard({ message, email, phone, vendor, holding }: { message: any; email?: string; phone?: string; vendor?: string; holding?: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <Card className="p-5">
@@ -371,7 +371,7 @@ function MessageCard({ message, email, holding }: { message: any; email?: string
         <div className="whitespace-pre-wrap px-4 py-3 text-sm leading-relaxed text-slate-800"><Rich text={message.body} /></div>
       </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <a className={holding ? btnSecondary : btnPrimary} href={mailtoLink(email, message)}>{holding ? "Send acknowledgement" : "Send to vendor"}</a>
+        <SendVia label={holding ? "Send acknowledgement" : "Send to vendor"} vendor={vendor ?? ""} email={email} phone={phone} message={message} className={holding ? btnSecondary : btnPrimary} />
         <button type="button" className={btnSecondary} onClick={() => { navigator.clipboard.writeText(`Subject: ${plainText(message.subject)}\n\n${plainText(message.body)}`); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
           {copied ? "Copied" : "Copy"}
         </button>
