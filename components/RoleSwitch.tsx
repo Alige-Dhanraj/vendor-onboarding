@@ -18,9 +18,9 @@ export default function RoleSwitch({ compact }: { compact?: boolean }) {
   }
   return (
     <div>
-      <div role="group" aria-label="View as role" className={`inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold ${compact ? "w-full" : ""}`}>
+      <div role="group" aria-label="View as role" className={`overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold ${compact ? "grid w-full grid-cols-3" : "inline-flex"}`}>
         {ROLES.map(([k, l]) => (
-          <button key={k} type="button" onClick={() => pick(k)} disabled={!!busy} aria-pressed={role === k} className={`${compact ? "flex-1" : ""} px-4 py-2.5 ${role === k ? "bg-[#1890ff] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{busy === k ? "…" : l}</button>
+          <button key={k} type="button" onClick={() => pick(k)} disabled={!!busy} aria-pressed={role === k} className={`${compact ? "px-1" : "px-4"} py-2.5 text-center ${role === k ? "bg-[#1890ff] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{busy === k ? "…" : l}</button>
         ))}
       </div>
       {err && <p className="mt-1 text-xs text-rose-700">{err}</p>}
