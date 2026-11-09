@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { reminderMessage } from "@/lib/engine/message";
-import { effectiveStatus, homeLine, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
+import { effectiveStatus, fmtDateTime, homeLine, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { Icon, type IconName } from "./icons";
 import { StatusBadge } from "./ui";
@@ -69,12 +69,12 @@ export default function Home({ firstName }: { firstName: string }) {
                       <div className="font-semibold text-slate-900 sm:truncate">{r.legal_name || "Unnamed vendor"}</div>
                       <div className="text-sm text-slate-500 sm:truncate">{r.headline}</div>
                     </div>
-                    <div className={`hidden text-xs sm:block ${stale ? "font-medium text-amber-700" : "text-slate-400"}`}>{waiting(r.started_at)}</div>
-                    <StatusBadge status={effectiveStatus(r)} />
+                    <div className={`hidden w-36 shrink-0 text-right text-xs sm:block ${stale ? "font-medium text-amber-700" : "text-slate-500"}`}>{waiting(r.started_at)}<div className="text-slate-400">{fmtDateTime(r.started_at)}</div></div>
+                    <div className="flex shrink-0 justify-end sm:w-44 sm:justify-start"><StatusBadge status={effectiveStatus(r)} /></div>
                   </Link>
                   {kind === "review"
-                    ? <Link href={`/runs/${r.id}`} className={rowBtn}>Review</Link>
-                    : <a href={mailtoLink(r.contact_email, reminderMessage(r.contact_name))} className={rowBtn}>Send reminder</a>}
+                    ? <Link href={`/runs/${r.id}`} className={`${rowBtn} sm:w-36 sm:justify-center`}>Review</Link>
+                    : <a href={mailtoLink(r.contact_email, reminderMessage(r.contact_name))} className={`${rowBtn} sm:w-36 sm:justify-center`}>Send reminder</a>}
                 </li>
               );
             })}
