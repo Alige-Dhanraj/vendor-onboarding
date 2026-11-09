@@ -1,5 +1,6 @@
 // Supabase implementation of the Store. Server-only: uses the service-role key, which bypasses
 // Row Level Security and must never reach the browser.
+import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CheckResult, ExtractedDoc, TestRegistry, VendorRecord } from "../engine/types";
 import { randomBytes } from "node:crypto";

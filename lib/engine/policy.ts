@@ -5,8 +5,8 @@
 // 3. Else any FIXABLE failure         -> PENDING (internal: PENDING_INFO)
 // 4. Else (passes, warnings, skips)   -> APPROVED
 //
-// UNVERIFIED checks never pass silently: they only occur alongside a FIXABLE C3/C4 failure
-// (wrong or unreadable document), which already makes the outcome PENDING.
+// UNVERIFIED checks never pass silently: alongside a FIXABLE failure the vendor is asked to fix it;
+// on their own they go to a reviewer.
 
 import { PLAIN } from "./plain";
 import type { CheckResult, Decision } from "./types";
@@ -30,11 +30,19 @@ export function decide(results: CheckResult[]): Decision {
       deciding_checks: [...review.map((r) => r.id), ...fixable.map((r) => r.id)],
     };
   }
-  if (fixable.length || unverified.length) {
+  if (fixable.length) {
     return {
       outcome: "PENDING", internal_status: "PENDING_INFO", review_flag: false,
-      headline: fixable.length ? `Waiting on the vendor: ${fixable.map(plain).join(", ")}.` : "Some checks could not be verified yet.",
+      headline: `Waiting on the vendor: ${fixable.map(plain).join(", ")}.`,
       deciding_checks: [...fixable.map((r) => r.id), ...unverified.map((r) => r.id)],
+    };
+  }
+  // Nothing the vendor can fix, but something could not be read or verified: a person decides.
+  if (unverified.length) {
+    return {
+      outcome: "PENDING", internal_status: "MANUAL_REVIEW", review_flag: true,
+      headline: `Needs a reviewer: could not verify ${unverified.map(plain).join(", ")}.`,
+      deciding_checks: unverified.map((r) => r.id),
     };
   }
   const warns = results.filter((r) => r.status === "WARN");

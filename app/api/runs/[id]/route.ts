@@ -1,11 +1,14 @@
 // GET /api/runs/:id: everything the run view needs, with short-lived signed URLs for documents.
 import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
+import { guard } from "@/lib/auth/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const g = await guard(); // any signed-in role; the middleware already requires a session
+  if ("error" in g) return g.error;
   const { id } = await params;
   const store = getStore();
   const bundle = await store.getRun(id);
