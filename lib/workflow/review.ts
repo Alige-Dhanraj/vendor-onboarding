@@ -1,5 +1,6 @@
 // Reviewer actions on a flagged run. A reason is mandatory and every action is logged.
 // Hard-stop rejections cannot be overridden in the MVP; only runs flagged for review can be.
+import { COMPANY } from "../brand";
 import type { Store } from "../store/types";
 import type { Decision } from "../engine/types";
 import { templateMessage } from "../engine/message";
@@ -41,7 +42,7 @@ export async function reviewRun(store: Store, args: { runId: string; action: "AP
   const hi = (form.contact.name || "").trim().split(/\s+/)[0] || "there";
   await save({
     subject: `${form.legal_name || "Your application"}: 1 item needed to complete your vendor onboarding`,
-    body: `Hi ${hi},\n\nThank you for applying to become a vendor with us. To complete your onboarding, please send:\n\n1. ${reason}\n\nJust reply to this email with it attached. Thank you!`,
+    body: `Hi ${hi},\n\nThank you for applying to become a vendor with ${COMPANY}. To complete your onboarding, please send:\n\n1. ${reason}\n\nJust reply to this email with it attached. Thank you!`,
     analyst_summary: `Reviewer requested information: ${reason}`,
   });
   return { action };

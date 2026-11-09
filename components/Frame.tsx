@@ -7,6 +7,7 @@ import HelpPanel from "./HelpPanel";
 import { Icon, type IconName } from "./icons";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { effectiveStatus, fmtDateTime } from "@/lib/ui-labels";
+import { COMPANY } from "@/lib/brand";
 
 interface U { name: string; email: string; role: string }
 const ROLE: Record<string, string> = { BUYER: "Buyer", REVIEWER: "Reviewer", ADMIN: "Admin" };
@@ -22,7 +23,7 @@ function PublicFrame({ path, children }: { path: string; children: React.ReactNo
   if (path === "/login") return <>{children}</>;
   return (
     <>
-      <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3"><Logo size="h-9 w-9" /><span className="font-bold tracking-tight">VendorGate</span></div></header>
+      <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3"><div><div className="font-bold tracking-tight">{COMPANY}</div><div className="text-xs text-slate-500">Vendor onboarding</div></div><span className="flex items-center gap-2 text-xs text-slate-400">Powered by <Logo size="h-6 w-6" /><b className="text-slate-600">VendorGate</b></span></div></header>
       <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">{children}</main>
     </>
   );
@@ -80,7 +81,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
   return (
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[272px] flex-col gap-1 overflow-y-auto p-4 lg:flex">
-        <Link href="/" className="flex items-center gap-3 px-2 pb-3 pt-1"><Logo /><span className="text-base font-bold tracking-tight">VendorGate</span></Link>
+        <Link href="/" className="flex items-center gap-3 px-2 pb-3 pt-1"><Logo /><span><span className="block text-base font-bold leading-tight tracking-tight">VendorGate</span><span className="block text-xs leading-tight text-slate-500">{COMPANY}</span></span></Link>
         <Link href="/new" className="mb-3 inline-flex items-center justify-center gap-2 rounded-lg bg-[#1890ff] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-[#40a9ff]"><Icon name="plus" className="h-4 w-4" />New vendor</Link>
         <div className="border-t border-slate-200 pt-3" />
         {nav.map(([h, l, i]) => item(h, l, i))}

@@ -1,4 +1,5 @@
 "use client";
+import { COMPANY } from "@/lib/brand";
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -30,7 +31,7 @@ function LoginForm() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="flex items-center justify-center px-5 py-10">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-3"><Logo /><div><div className="text-lg font-bold tracking-tight">VendorGate</div><div className="text-sm text-slate-500">Check new vendors in minutes</div></div></div>
+          <div className="mb-8 flex items-center gap-3"><Logo /><div><div className="text-lg font-bold tracking-tight">VendorGate</div><div className="text-sm text-slate-500">Vendor onboarding for {COMPANY}</div></div></div>
           <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
           <p className="mt-1 text-slate-500">Enter your email and password to continue.</p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">

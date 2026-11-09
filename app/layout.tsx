@@ -5,9 +5,10 @@ import "@fontsource/open-sans/700.css";
 import "./globals.css";
 import Frame from "@/components/Frame";
 import { getSession } from "@/lib/auth/server";
+import { COMPANY } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "VendorGate · Vendor onboarding",
+  title: `${COMPANY} · Vendor onboarding`,
   description: "Vendor submission to Approved, Pending or Rejected, with every decision traced to its evidence.",
 };
 

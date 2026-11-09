@@ -3,6 +3,7 @@
 // **double asterisks** mark bold; the screen renders them, email links and copy strip them.
 
 import type { CheckResult, Decision, SubmissionForm } from "./types";
+import { COMPANY as BUYER } from "../brand";
 
 export interface DraftMessage {
   subject: string;
@@ -61,7 +62,7 @@ export function templateMessage(form: SubmissionForm, decision: Decision, result
   const list = fixes.length ? fixes : ["**Documents**: please resend clear copies"];
   return {
     subject: `${company}: ${list.length} item${list.length === 1 ? "" : "s"} needed to complete your vendor onboarding`,
-    body: `${hi}\n\nThank you for applying to become a vendor with us. To complete your onboarding, please fix the following:\n\n${numbered(list)}\n\nJust reply to this email with the corrected details or documents attached. Thank you!`,
+    body: `${hi}\n\nThank you for applying to become a vendor with ${BUYER}. To complete your onboarding, please fix the following:\n\n${numbered(list)}\n\nJust reply to this email with the corrected details or documents attached. Thank you!`,
     analyst_summary: `Pending vendor action on ${checks}.`,
   };
 }
@@ -85,7 +86,7 @@ export function reminderMessage(contactName: string) {
 /** Short email that carries the vendor's private registration link. */
 export function inviteMessage(contactName: string, link: string) {
   return {
-    subject: "Please register as our vendor",
-    body: `Hi ${firstName(contactName)},\n\nPlease register as our vendor using this private link:\n\n${link}\n\nUpload your documents there and you can check your status at any time. It takes about 3 minutes.\n\nThank you!`,
+    subject: `Please register as a vendor with ${BUYER}`,
+    body: `Hi ${firstName(contactName)},\n\nPlease register as a vendor with ${BUYER} using this private link:\n\n${link}\n\nUpload your documents there and you can check your status at any time. It takes about 3 minutes.\n\nThank you!`,
   };
 }
