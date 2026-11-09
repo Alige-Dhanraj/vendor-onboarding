@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 import { IntakeError, SLOTS, submit, type IncomingFile } from "@/lib/workflow/intake";
 import { aiMode } from "@/lib/workflow/run";
+import { getSession } from "@/lib/auth/server";
 import type { SubmissionForm } from "@/lib/engine/types";
 
 export const runtime = "nodejs";
@@ -24,8 +25,9 @@ export async function POST(req: Request) {
       }
     }
     const store = getStore();
+    const session = await getSession();
     const sub = await submit(store, {
-      form, files,
+      form, files, submittedBy: session?.email,
       scenarioId: (fd.get("scenario_id") as string) || null,
       vendorRef: (fd.get("vendor_ref") as string) || undefined,
     });

@@ -444,3 +444,19 @@ test("a wrong phone number stops the submission before any checking starts", asy
   f.contact.phone = "98765 43210";
   assert.doesNotThrow(() => validateIncoming(f, []));
 });
+
+test("four eyes: the server records who entered a vendor and hides it from the vendor's page", async () => {
+  const { submit } = await import("../lib/workflow/intake");
+  const { createMemoryStore } = await import("../lib/store/memory");
+  const { buildView } = await import("../lib/workflow/invite");
+  const store = createMemoryStore({ vendors: VENDOR_MASTER_SEED, blocklist: BLOCKLIST_SEED, registry: TEST_REGISTRY });
+  const form = { ...structuredClone(SCENARIOS[0].form), submitted_by: "someone-else@x.example" };
+  const sub = await submit(store, { form, files: [], submittedBy: "buyer@vendorgate.example" });
+  assert.equal(sub.form_data.submitted_by, "buyer@vendorgate.example"); // the browser's value is overwritten
+  const none = await submit(store, { form: structuredClone(SCENARIOS[0].form), files: [], submittedBy: undefined, vendorRef: "other-vendor" });
+  assert.equal(none.form_data.submitted_by, undefined);
+  const run = await store.createRun(sub.id, "offline");
+  const bundle = (await store.getRun(run.id))!;
+  const view = buildView({ token: "t", vendor_ref: sub.vendor_ref, contact_name: "N", contact_email: "", created_by: "x", created_at: "", expires_at: "" }, { ...bundle, run: { ...bundle.run, status: "COMPLETED", internal_status: "PENDING_INFO", final_status: "PENDING_INFO" } });
+  assert.equal(view.form?.submitted_by, undefined);
+});

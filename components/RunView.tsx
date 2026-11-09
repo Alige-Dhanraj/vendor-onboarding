@@ -22,12 +22,13 @@ export default function RunView({ id }: { id: string }) {
   const [data, setData] = useState<Bundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [meEmail, setMeEmail] = useState<string | null>(null);
   const [tab, setTab] = useState<"summary" | "checks" | "documents" | "history">("summary");
   const [toast, setToast] = useState<string | null>(null);
   const started = useRef(false);
   const sawRunning = useRef(false);
 
-  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((j) => setRole(j.role ?? null)).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/auth/me").then((r) => r.json()).then((j) => { setRole(j.role ?? null); setMeEmail(j.email ?? null); }).catch(() => {}); }, []);
 
   async function load() {
     const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
@@ -89,7 +90,9 @@ export default function RunView({ id }: { id: string }) {
   const rank = (c: CheckResult) => c.status === "FAIL" ? (c.severity === "HARD_STOP" ? 0 : c.severity === "REVIEW" ? 1 : 2) : c.status === "UNVERIFIED" ? 3 : 4;
   const problems: CheckResult[] = checks.filter((c: CheckResult) => ["FAIL", "UNVERIFIED", "WARN"].includes(c.status)).sort((a: CheckResult, b: CheckResult) => rank(a) - rank(b));
   const passed = checks.length - problems.length;
-  const canDecide = role === "REVIEWER" || role === "ADMIN";
+  const isOwnCase = !!meEmail && form.submitted_by === meEmail;
+  const canManage = role === "REVIEWER" || role === "ADMIN";
+  const canDecide = canManage && !isOwnCase;
   const needsDecision = !running && run.review_flag && !run.review_resolved;
   const email = form.contact?.email;
 
@@ -127,7 +130,7 @@ export default function RunView({ id }: { id: string }) {
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
               {status === "PENDING_INFO" && (submission.scenario_id ? <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link> : <CorrectDocs token={data.invite_token} vendorRef={submission.vendor_ref} name={form.contact?.name} email={form.contact?.email} />)}
               {status === "APPROVED" && !inactive && <Link className={btnSecondary} href="/new">Next vendor</Link>}
-              {inactive && canDecide && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
+              {inactive && canManage && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
             </div>
             <div className="mt-3 text-xs text-slate-500">
               Checked in {fmtMs(run.duration_ms)} · {checks.length} checks run
@@ -154,7 +157,7 @@ export default function RunView({ id }: { id: string }) {
       {!running && data.previous && <WhatChanged prev={data.previous} checks={checks} running={false} />}
       {needsDecision && (canDecide
         ? <div id="decide" className="scroll-mt-24"><ReviewPanel run={run} actions={reviewer_actions} onDone={load} /></div>
-        : role ? <Card className="border-orange-200 p-4 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
+        : role ? <Card className="border-orange-200 p-4 text-sm text-slate-700">{isOwnCase ? "You entered this vendor, so someone else has to decide it. Ask another Reviewer or Admin to sign in and decide." : "A reviewer needs to decide this case. Their decision will show here."}</Card> : null)}
       {!running && run.review_flag && run.review_resolved && reviewer_actions.length > 0 && <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />}
 
       {!running && (
@@ -175,7 +178,7 @@ export default function RunView({ id }: { id: string }) {
             </section>
           ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">✓ All {checks.length} checks passed. Nothing needs attention.</p>)}
           {status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} at={run.finished_at} />}
-          {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
+          {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canManage} onDone={load} /></div>}
           {message && (
             <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">{status === "MANUAL_REVIEW" ? "Holding note to the vendor (optional)" : "Preview the email to the vendor"}</summary>

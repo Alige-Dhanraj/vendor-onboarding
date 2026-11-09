@@ -45,6 +45,11 @@ function LoginForm() {
             <div className="mt-2 flex flex-wrap gap-2">
               {DEMO.map(([role, mail]) => <button key={role} type="button" onClick={() => setEmail(mail)} className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-50">{role}</button>)}
             </div>
+            <ul className="mt-3 space-y-1.5 text-xs text-slate-600">
+              <li><b className="text-slate-800">Buyer</b>: adds vendors and sends links. Cannot approve a flagged vendor.</li>
+              <li><b className="text-slate-800">Reviewer</b>: decides flagged vendors, with a written reason.</li>
+              <li><b className="text-slate-800">Admin</b>: everything a Reviewer can do, plus Settings.</li>
+            </ul>
             <p className="mt-2 text-xs text-slate-500">Tap a role to fill the email. All three use the same password.</p>
           </div>
         </div>

@@ -56,7 +56,7 @@ export function buildView(invite: InviteRow, b: RunBundle | null): VendorView {
     state, contact_name: invite.contact_name, contact_email: invite.contact_email,
     fixes: need && !fixes.length ? ["Please check your details and documents."] : fixes,
     message: (state === "APPROVED" || state === "REJECTED") && b?.message ? { subject: b.message.subject, body: b.message.body } : null,
-    form: need ? b.submission.form_data : null,
+    form: need ? { ...b.submission.form_data, submitted_by: undefined } : null, // never show a staff email to the vendor
     kept: need ? b.documents.map((d) => ({ slot: d.slot, file_name: d.file_name })) : [],
   };
 }

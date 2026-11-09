@@ -17,6 +17,8 @@ export type DocType = DocSlot | "OTHER" | "UNREADABLE";
 /** What the vendor typed into the form. */
 export interface SubmissionForm {
   vendor_ref: string;
+  /** Email of the staff member who entered this submission (set by the server, never by the browser). Used so nobody decides their own case. */
+  submitted_by?: string;
   legal_name: string;
   trade_name?: string;
   entity_type: EntityType | "";
