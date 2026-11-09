@@ -10,7 +10,6 @@ export const ACCOUNTS: Account[] = [
   { email: "reviewer@vendorgate.example", id: "reviewer", phone: "9000000002", name: "Rohan Iyer", role: "REVIEWER" },
   { email: "admin@vendorgate.example", id: "admin", phone: "9000000003", name: "Meera Nair", role: "ADMIN" },
   { email: "vendor@vendorgate.example", id: "vendor", phone: "9000000000", name: "Demo User", role: "ADMIN" }, // the one-line demo login: vendor / 12345
-  { email: "abcde", id: "abcde", phone: "", name: "Alige", role: "ADMIN" },
 ];
 
 /** Demo password, accepted for every account. DEMO_PASSWORD (if set) is accepted too. Replace before real use. */
@@ -22,7 +21,7 @@ function demoPassword(): string | null {
 }
 
 /** The demo account behind each role, used by the demo role switcher. */
-export const accountForRole = (role: SessionUser["role"]) => ACCOUNTS.find((a) => a.role === role && a.id !== "vendor" && a.id !== "abcde")!;
+export const accountForRole = (role: SessionUser["role"]) => ACCOUNTS.find((a) => a.role === role && a.id !== "vendor")!;
 
 const strip = ({ email, name, role }: Account): SessionUser => ({ email, name, role });
 const lastTen = (s: string) => s.replace(/\D/g, "").slice(-10);
