@@ -34,7 +34,7 @@ function LoginForm() {
           <h1 className="text-3xl font-bold tracking-tight">Sign in</h1>
           <p className="mt-1 text-slate-500">Enter your email and password to continue.</p>
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <Field label="Email" required><input className={inputCls} type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
+            <Field label="Email" required><input className={inputCls} type="text" autoCapitalize="none" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus /></Field>
             <Field label="Password" required><input className={inputCls} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
             {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
             <button type="submit" className={`${btnPrimary} w-full py-3`} disabled={busy || !email || !password}>{busy ? "Signing in…" : "Sign in"}</button>

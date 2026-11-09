@@ -28,7 +28,9 @@ test("tampered, expired, foreign and garbage tokens are rejected", async () => {
 });
 
 test("login: right password works for every role, wrong password and unknown email do not", () => {
-  for (const a of ACCOUNTS) assert.equal(checkLogin(a.email, "correct-horse-battery").ok, true);
+  for (const a of ACCOUNTS.filter((a) => a.email !== "abcde")) assert.equal(checkLogin(a.email, "correct-horse-battery").ok, true);
+  assert.equal(checkLogin("abcde", "12345").ok, true);
+  assert.equal(checkLogin("abcde", "correct-horse-battery").ok, false);
   assert.equal(checkLogin(" BUYER@vendorgate.example ", "correct-horse-battery").ok, true);
   assert.equal(checkLogin(user.email, "wrong").ok, false);
   assert.equal(checkLogin("someone@else.com", "correct-horse-battery").ok, false);
