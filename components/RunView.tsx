@@ -201,7 +201,7 @@ function Problem({ c }: { c: CheckResult }) {
     <div className={`rounded-xl border p-4 ${tone}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="font-medium text-slate-900">{PLAIN[c.id] ?? c.title}</div>
-        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-slate-300 text-xs text-slate-500 hover:bg-white">i</button>
+        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-300 text-xs text-slate-500 hover:bg-white">i</button>
       </div>
       <p className="mt-1 text-sm text-slate-700">{c.reason}</p>
       {c.sources.length > 1 && (

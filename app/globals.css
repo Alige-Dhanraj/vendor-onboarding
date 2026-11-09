@@ -23,3 +23,10 @@ h1, h2 { letter-spacing: -0.01em; }
 .toast-card { animation: toast-in 2.4s ease forwards; }
 @keyframes draw { to { stroke-dashoffset: 0 } }
 .tick-draw { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .5s .15s ease forwards; }
+
+/* Phones: stop sideways zoom-out, stop iOS zooming into inputs, make taps instant. */
+html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+a, button, summary, label, select, input, textarea, [role="button"] { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (max-width: 1023px) {
+  input, select, textarea { font-size: 16px !important; }
+}
