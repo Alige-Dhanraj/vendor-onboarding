@@ -7,7 +7,7 @@ import { GST_STATE_CODES, phoneProblem } from "@/lib/engine/ids";
 import { parseSignature } from "@/lib/engine/signature";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
 import { inviteMessage } from "@/lib/engine/message";
-import { SLOT_LABEL, mailtoLink } from "@/lib/ui-labels";
+import { SLOT_LABEL, mailtoLink, plainText } from "@/lib/ui-labels";
 import { Card, Field, Pill, SectionTitle, btnPrimary, btnSecondary, inputCls } from "./ui";
 
 const EMPTY: SubmissionForm = {
@@ -314,6 +314,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={btnSecondary} onClick={() => navigator.clipboard?.writeText(link)}>Copy link</button>
                         <a className={btnPrimary} href={mailtoLink(reqEmail, inviteMessage(reqName, link))}>Open email</a>
+                        <a className="inline-flex items-center justify-center rounded-lg bg-[#25D366] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-white hover:bg-[#1fb857]" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${encodeURIComponent(plainText(inviteMessage(reqName, link).body))}`}>Send on WhatsApp</a>
                       </div>
                       <p className="text-xs text-slate-500">The vendor uploads the documents there and sees their own status. You will see them under Vendors.</p>
                     </div>
