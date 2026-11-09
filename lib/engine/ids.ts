@@ -97,6 +97,18 @@ export function isPhone(p: string, country: string): boolean {
   return digits.length >= 8;
 }
 
+/** Plain-language reason a phone number is not usable, or null when it is fine (or empty). Used live on the form and by check V6. */
+export function phoneProblem(p: string, country: string): string | null {
+  const raw = (p ?? "").trim();
+  if (!raw) return null;
+  if (isPhone(raw, country)) return null;
+  const digits = raw.replace(/(ext\.?|extn\.?|x)\s*\d+\s*$/i, "").replace(/[^\d]/g, "").replace(/^(0091|91|0)(?=\d{10,})/, "");
+  if (/[a-z]/i.test(raw.replace(/(ext\.?|extn\.?|x)\s*\d+\s*$/i, ""))) return "Phone should contain only digits (you can add +, spaces or dashes).";
+  if (digits.length < 10) return `Add ${10 - digits.length} more digit${10 - digits.length === 1 ? "" : "s"}. A phone number needs at least 10 digits; for a landline, include the STD code (e.g. 044 2345 6789).`;
+  if (country === "IN" && digits.length > 10) return "This has too many digits. Remove extra digits (a number is 10 digits after +91 or 0).";
+  return "This doesn't look like a valid phone number. Check the digits.";
+}
+
 /** Simple non-cryptographic hash so bank accounts can be compared without storing them in full. */
 export function hashAccount(acct: string): string {
   const s = (acct ?? "").replace(/\D/g, "");

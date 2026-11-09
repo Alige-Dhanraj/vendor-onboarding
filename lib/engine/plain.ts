@@ -9,7 +9,7 @@ export const PLAIN: Record<string, string> = {
   V3: "GST number has a typo",
   V4: "Bank code written wrongly",
   V5: "Tax ID wrong for the country",
-  V6: "Contact details written wrongly",
+  V6: "Phone number or pincode looks incomplete",
   K1: "PAN and GST number don't match",
   K2: "PAN is for a different type of holder",
   K3: "PAN name letter differs",

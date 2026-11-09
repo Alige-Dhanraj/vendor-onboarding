@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import {
   EXPECTED_PAN_TYPE, GST_STATE_CODES, PAN_HOLDER_TYPES, clean, gstinChecksumOk, gstinPan, gstinState, gstinStructure,
-  fixFixedPositions, hashAccount, isEin, isEmail, isIfsc, isPan, isPhone, isPincode, isRoutingNumber, isUsZip, last4, mask,
+  fixFixedPositions, hashAccount, isEin, isIfsc, isPan, isPhone, phoneProblem, isPincode, isRoutingNumber, isUsZip, last4, mask,
 } from "./ids";
 import { compareByRules, fallbackJudge, nameSimilarity, normaliseName, pairKey } from "./names";
 
@@ -213,15 +213,16 @@ function v5(ctx: CheckContext): CheckResult {
 
 function v6(ctx: CheckContext): CheckResult {
   const f = ctx.form;
-  const b: Base = { id: "V6", layer: "VALID", title: "Contact details format", checked: "Postal code, email and phone", rule: "V6: Indian pincode is 6 digits (or a US ZIP); email and phone must be well-formed. Mobile numbers, landlines with an STD code and toll-free numbers are all accepted. Contact details are only checked for format. They are not compared with the documents, because a company can use a different number or email today than the one it registered with." };
+  const b: Base = { id: "V6", layer: "VALID", title: "Contact details format", checked: "Postal code and phone number", rule: "V6: Indian pincode is 6 digits (or a US ZIP). A phone number needs at least 10 digits; mobiles, landlines with an STD code (with or without +91 or 0) and toll-free numbers are accepted. Names and email addresses are not judged, and no contact detail is compared with the documents, because a company can use a different number or email today than the one it registered with." };
   const issues: string[] = [];
   const pc = f.address.postal_code;
   if (pc && !(f.country === "US" ? isUsZip(pc) : isPincode(pc))) issues.push(`${f.country === "US" ? "ZIP code" : "pincode"} "${pc}"`);
-  if (f.contact.email && !isEmail(f.contact.email)) issues.push(`email "${f.contact.email}"`);
-  if (f.contact.phone && !isPhone(f.contact.phone, f.country)) issues.push(`phone "${f.contact.phone}"`);
-  if (f.contact.alt_phone && !isPhone(f.contact.alt_phone, f.country)) issues.push(`alternate mobile "${f.contact.alt_phone}"`);
+  const ph = phoneProblem(f.contact.phone, f.country);
+  if (ph) issues.push(`phone "${f.contact.phone}" (${ph.split(". ")[0].replace(/\.$/, "").toLowerCase()})`);
+  const ap = phoneProblem(f.contact.alt_phone ?? "", f.country);
+  if (ap) issues.push(`alternate mobile "${f.contact.alt_phone}" (${ap.split(". ")[0].replace(/\.$/, "").toLowerCase()})`);
   const sources = [formSrc(`${pc} · ${f.contact.email} · ${f.contact.phone}`)];
-  if (!issues.length) return result(b, "PASS", null, { sources, reason: "Contact details are well-formed." });
+  if (!issues.length) return result(b, "PASS", null, { sources, reason: "Phone number and pincode look complete." });
   return result(b, "FAIL", "FIXABLE", { sources, reason: `Not valid: ${issues.join(", ")}.`, next_action: "Ask the vendor to correct them.", vendor_fix: `**Contact details**: please correct ${issues.join(", ")}` });
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SCENARIOS } from "@/lib/scenarios";
-import { GST_STATE_CODES } from "@/lib/engine/ids";
+import { GST_STATE_CODES, phoneProblem } from "@/lib/engine/ids";
 import { parseSignature } from "@/lib/engine/signature";
 import type { DocSlot, SubmissionForm } from "@/lib/engine/types";
 import { inviteMessage } from "@/lib/engine/message";
@@ -362,8 +362,8 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Contact name" required>{input("contact.name", form.contact.name)}</Field>
             <Field label="Email" required>{input("contact.email", form.contact.email)}</Field>
-            <Field label="Phone" required>{input("contact.phone", form.contact.phone)}</Field>
-            <Field label="Alternate mobile (optional)">{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
+            <Field label="Phone" required error={phoneProblem(form.contact.phone, form.country)}>{input("contact.phone", form.contact.phone)}</Field>
+            <Field label="Alternate mobile (optional)" error={phoneProblem(form.contact.alt_phone ?? "", form.country)}>{input("contact.alt_phone", form.contact.alt_phone ?? "")}</Field>
           </div>
           <details className="mt-3 text-sm">
             <summary className="-my-2 cursor-pointer py-2 font-medium text-indigo-700">Paste an email signature to fill the contact</summary>

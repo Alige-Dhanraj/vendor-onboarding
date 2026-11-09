@@ -13,6 +13,20 @@ export interface DraftMessage {
 const lines = (rs: CheckResult[]) => rs.flatMap((r) => (r.vendor_fix ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
 const numbered = (ls: string[]) => ls.map((l, i) => `${i + 1}. ${l}`).join("\n");
 const firstName = (n: string) => (n || "").trim().split(/\s+/)[0] || "there";
+const US = (f: SubmissionForm) => f.country === "US";
+/** The record we hold for the vendor, so they can see exactly how they were registered. Bank account is shown masked. */
+function registered(f: SubmissionForm): string {
+  const acct = (f.bank?.account_number ?? "").replace(/\D/g, "");
+  const addr = [f.address?.street, f.address?.city, f.address?.state, f.address?.postal_code].filter(Boolean).join(", ");
+  const rows: [string, string | undefined][] = [
+    ["Registered name", f.legal_name],
+    ...(US(f) ? ([["EIN", f.tax?.ein]] as [string, string | undefined][]) : ([["PAN", f.tax?.pan], ["GSTIN", f.tax?.gstin || "Not GST-registered"]] as [string, string | undefined][])),
+    ["Address", addr],
+    ["Contact", [f.contact?.name, f.contact?.email, f.contact?.phone, f.contact?.alt_phone].filter(Boolean).join(" · ")],
+    ["Bank account", [f.bank?.account_holder, acct ? "ending " + acct.slice(-4) : ""].filter(Boolean).join(", ")],
+  ];
+  return rows.filter(([, v]) => v).map(([k, v]) => `• ${k}: ${v}`).join("\n");
+}
 const FOOT = "Questions? Just reply to this email.";
 
 export function templateMessage(form: SubmissionForm, decision: Decision, results: CheckResult[]): DraftMessage {
@@ -23,8 +37,8 @@ export function templateMessage(form: SubmissionForm, decision: Decision, result
 
   if (decision.internal_status === "APPROVED") {
     return {
-      subject: `Registration approved: ${company}`,
-      body: `${hi}\n\nYour vendor registration is **approved**.\n\n1. Quote the **purchase order number** on every invoice.\n\n${FOOT}`,
+      subject: `You're onboarded as a vendor: ${company}`,
+      body: `${hi}\n\nYou have been **onboarded as a vendor**. This is what we have registered:\n\n${registered(form)}\n\nIf anything above is wrong, reply to this email and we will correct it.\n\nNext: quote the **purchase order number** on every invoice.\n\n${FOOT}`,
       analyst_summary: "Approved: all checks passed.",
     };
   }
