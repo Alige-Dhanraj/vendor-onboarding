@@ -198,6 +198,12 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const badPhone = phoneProblem(form.contact.phone, form.country) ?? phoneProblem(form.contact.alt_phone ?? "", form.country);
+    if (badPhone) {
+      setPhoneDone({ "contact.phone": true, "contact.alt_phone": true });
+      setError("Fix the phone number first. Checking starts only when it is correct.");
+      return;
+    }
     const slots = docs.map((d) => d.slot).filter(Boolean);
     if (docs.some((d) => !d.slot)) return setError("Choose a document type for every file (or remove it).");
     if (new Set(slots).size !== slots.length) return setError("Two files have the same document type. Remove one or change its type.");

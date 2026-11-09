@@ -1,4 +1,5 @@
 // Intake: validate the uploaded files, store them privately, record the submission.
+import { phoneProblem } from "../engine/ids";
 import type { DocSlot, SubmissionForm } from "../engine/types";
 import type { DocumentRow, Store, SubmissionRow } from "../store/types";
 import { sha256 } from "./run";
@@ -32,6 +33,9 @@ export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
     const v = (form as unknown as Record<string, unknown>)[k];
     if (v != null && (typeof v !== "object" || Array.isArray(v))) throw new IntakeError(`The "${k}" section is not valid.`);
   }
+  const c = (form.contact ?? {}) as Partial<SubmissionForm["contact"]>;
+  const badPhone = (typeof c.phone === "string" && phoneProblem(c.phone, form.country)) || (typeof c.alt_phone === "string" && phoneProblem(c.alt_phone, form.country));
+  if (badPhone) throw new IntakeError(`Phone number: ${badPhone}`);
   if (files.length > MAX_FILES) throw new IntakeError(`At most ${MAX_FILES} files.`);
   for (const f of files) {
     if (!SLOTS.includes(f.slot)) throw new IntakeError(`Unknown document slot: ${f.slot}`);

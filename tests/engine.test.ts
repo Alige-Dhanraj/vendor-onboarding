@@ -435,3 +435,12 @@ test("phone: names and emails are never judged; short phone numbers get a plain-
   ctx.form = { ...ctx.form, contact: { ...ctx.form.contact, phone: "98765 43210" } };
   assert.equal(runChecks(ctx).find((r) => r.id === "V6")!.status, "PASS");
 });
+
+test("a wrong phone number stops the submission before any checking starts", async () => {
+  const { validateIncoming } = await import("../lib/workflow/intake");
+  const f = structuredClone(SCENARIOS[0].form);
+  f.contact.phone = "4552626";
+  assert.throws(() => validateIncoming(f, []), /Phone number/);
+  f.contact.phone = "98765 43210";
+  assert.doesNotThrow(() => validateIncoming(f, []));
+});
