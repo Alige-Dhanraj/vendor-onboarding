@@ -54,7 +54,9 @@ export function fallbackJudge(a: string, b: string): NameJudgement {
   const ta = normaliseName(a).split(" ");
   const tb = normaliseName(b).split(" ");
   const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
-  if (short.length === long.length && short.every((w, i) => long[i].startsWith(w) || w.startsWith(long[i]))) {
+  // An abbreviation is at least 3 letters and clearly shorter (3+ letters dropped), so "ABC" vs "ABCD" is not a match.
+  const abbrev = (x: string, y: string) => x === y || (x.length >= 3 && y.length - x.length >= 3 && y.startsWith(x));
+  if (short.length === long.length && short.every((w, i) => abbrev(w, long[i]) || abbrev(long[i], w))) {
     return { verdict: "SAME", reason: "Each word matches as an abbreviation of the other name (rule-based fallback).", by: "FALLBACK" };
   }
   const generic = new Set(["PVT", "LTD", "CO", "LLP", "AND", "INC", "CORP", "TRADERS", "ENTERPRISES", "INDUSTRIES", "SERVICES", "SUPPLIES"]);

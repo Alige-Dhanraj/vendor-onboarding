@@ -385,3 +385,18 @@ test("intake rejects a form without legal name, country, or with a non-object se
   assert.throws(() => validateIncoming({ ...ok, country: "" }, []), /Country/);
   assert.throws(() => validateIncoming({ ...ok, tax: "x" }, []), /tax/);
 });
+
+test("fallback name judge: near-identical names are not 'same'; real abbreviations are", async () => {
+  const { fallbackJudge } = await import("../lib/engine/names");
+  assert.notEqual(fallbackJudge("ABC Engineering", "ABCD Engineering").verdict, "SAME");
+  assert.equal(fallbackJudge("Nilgiri Precision Comp Pvt Ltd", "Nilgiri Precision Components Pvt Ltd").verdict, "SAME");
+});
+
+test("submit turns non-text nested fields into text instead of crashing", async () => {
+  const { submit } = await import("../lib/workflow/intake");
+  const { createMemoryStore } = await import("../lib/store/memory");
+  const sub = await submit(createMemoryStore({ vendors: [], blocklist: [], registry: {} }), { form: { legal_name: "X Pvt Ltd", country: "IN", contact: { email: 123, name: null }, tax: { pan: 5 }, bank: null } as any, files: [] });
+  assert.equal((sub.form_data as any).contact.email, "123");
+  assert.equal((sub.form_data as any).contact.name, "");
+  assert.equal((sub.form_data as any).tax.pan, "5");
+});

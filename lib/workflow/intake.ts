@@ -49,7 +49,9 @@ export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
 export async function submit(store: Store, args: { form: SubmissionForm; files: IncomingFile[]; scenarioId?: string | null; vendorRef?: string; keep?: DocumentRow[] }): Promise<SubmissionRow> {
   validateIncoming(args.form, args.files);
   const vendor_ref = args.vendorRef || args.form.vendor_ref || slug(args.form.legal_name);
-  const g = args.form as Partial<SubmissionForm>;
+  // Nested fields must be text: anything else (numbers, objects, null) is turned into text or dropped.
+  const text = (o: unknown) => Object.fromEntries(Object.entries((o && typeof o === "object" ? o : {}) as Record<string, unknown>).map(([k, v]) => [k, typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : ""]));
+  const g = { ...args.form, address: text(args.form.address), contact: text(args.form.contact), tax: text(args.form.tax), bank: text(args.form.bank) } as unknown as Partial<SubmissionForm>;
   const form: SubmissionForm = { ...args.form, vendor_ref, address: { ...(g.address ?? {}) } as SubmissionForm["address"], contact: { ...(g.contact ?? {}) } as SubmissionForm["contact"], tax: { ...(g.tax ?? {}) }, bank: { ...(g.bank ?? {}) } as SubmissionForm["bank"] };
   const sub = await store.createSubmission({ vendor_ref, scenario_id: args.scenarioId ?? null, form });
   for (const f of args.files) {
