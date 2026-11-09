@@ -19,8 +19,8 @@ const EMPTY: SubmissionForm = {
 };
 
 const GROUPS = [
-  { key: "happy", label: "Happy path" }, { key: "edge", label: "Edge cases" },
-  { key: "negative", label: "Negative tests" }, { key: "reserve", label: "Reserve cases" },
+  { key: "happy", label: "Clean vendor" }, { key: "edge", label: "Problem cases the system should catch" },
+  { key: "negative", label: "Data-entry mistakes" }, { key: "reserve", label: "More cases" },
 ];
 const SLOTS: DocSlot[] = ["GST_CERTIFICATE", "PAN_CARD", "BANK_PROOF", "GST_DECLARATION", "EIN_NOTICE"];
 
