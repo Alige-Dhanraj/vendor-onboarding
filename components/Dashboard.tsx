@@ -21,6 +21,7 @@ function Kpi({ label, value, sub, icon, hero }: { label: string; value: string; 
 
 export default function Dashboard() {
   const data = useRuns(8000);
+  const [range, setRange] = useState<"7" | "30" | "all">("all");
   const [manual, setManual] = useState("15"); // starting assumption: 15 minutes per manual check, editable
   useEffect(() => { try { setManual(localStorage.getItem("vg_manual_minutes") ?? "15"); } catch { /* ignore */ } }, []);
 
@@ -28,8 +29,10 @@ export default function Dashboard() {
     return <div className="mx-auto max-w-5xl space-y-4">{[0, 1, 2].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-100" />)}</div>;
   }
 
-  const s = data.stats;
-  const done: any[] = data.runs.filter((r: any) => r.status !== "RUNNING");
+  const cutoff = range === "all" ? 0 : Date.now() - Number(range) * 86400000;
+  const done: any[] = data.runs.filter((r: any) => r.status !== "RUNNING" && new Date(r.started_at).getTime() >= cutoff);
+  const durs = done.map((r: any) => r.duration_ms ?? 0).filter((x: number) => x > 0);
+  const s = { total: done.length, avg_ms: durs.length ? Math.round(durs.reduce((a: number, b: number) => a + b, 0) / durs.length) : 0, auto_cleared: done.filter((r: any) => r.internal_status === "APPROVED").length };
   const latest: any[] = latestPerVendor(done);
   const review = latest.filter((r) => r.review_flag && !r.review_resolved);
   const waits = latest.filter((r) => !(r.review_flag && !r.review_resolved) && effectiveStatus(r) === "PENDING_INFO");
@@ -57,7 +60,14 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-600">Vendor onboarding at a glance: volume, speed, and what needs attention. Updated live.</p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Date range" className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white text-xs font-semibold">
+            {([["7", "Last 7 days"], ["30", "Last 30 days"], ["all", "All time"]] as const).map(([k, l]) => (
+              <button key={k} type="button" onClick={() => setRange(k)} className={`px-3 py-2.5 ${range === k ? "bg-[#1890ff] text-white" : "text-slate-600 hover:bg-slate-50"}`}>{l}</button>
+            ))}
+          </div>
         <a href="/api/vendors/export" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-800 hover:bg-slate-50">Export approved vendors (CSV)</a>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -101,7 +111,7 @@ export default function Dashboard() {
         </Card>
 
         <Card className="p-4 sm:p-5">
-          <SectionTitle>Most common problems found</SectionTitle>
+          <SectionTitle hint={range === "all" ? undefined : "All time"}>Most common problems found</SectionTitle>
           {issues.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No problems found yet.</p> : (
             <ul className="space-y-3">
               {issues.map((i) => (

@@ -69,6 +69,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set());
   const [scenarioId, setScenarioId] = useState("");
+  const [demoOpen, setDemoOpen] = useState(false);
   const [vendorRef, setVendorRef] = useState("");
   const [version, setVersion] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
@@ -394,8 +395,9 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
           {error && <p className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
 
           {demo && (
-            <div className="mt-6 border-t border-slate-100 pt-5">
-              <div className="mb-2 text-xs font-medium text-slate-600">Test vendors</div>
+            <details className="mt-6 border-t border-slate-100 pt-4" open={demoOpen || !!scenarioId} onToggle={(e) => setDemoOpen((e.target as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Demo mode · load sample data</summary>
+              <div className="mt-3">
               <select className={inputCls} value={scenarioId} onChange={(e) => loadScenario(e.target.value)}>
                 <option value="">Choose…</option>
                 {GROUPS.map((g) => (
@@ -410,7 +412,8 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
                   {version === 1 ? "Load corrected resubmission" : "Back to first submission"}
                 </button>
               )}
-            </div>
+              </div>
+            </details>
           )}
           {vendorRef && <p className="mt-3 text-xs text-slate-500">New version for <span className="mono">{vendorRef}</span>.</p>}
         </Card>

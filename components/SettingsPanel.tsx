@@ -40,9 +40,10 @@ export default function SettingsPanel({ users, accountingHost }: { users: { name
       </Card>
 
       <Card className="p-5">
-        <SectionTitle>Test data</SectionTitle>
+        <SectionTitle>Demo tools</SectionTitle>
+        <p className="mb-3 text-sm text-slate-600">For demos and testing only. Loads sample vendors into the form, or clears every vendor check and restores the 3 starting vendors.</p>
         <div className="flex flex-wrap items-center gap-3">
-          <Link href="/new?demo=1" className={btnSecondary}>Open test vendors</Link>
+          <Link href="/new?demo=1" className={btnSecondary}>Load sample vendors</Link>
           <button className={`${btnSecondary} text-rose-700`} onClick={async () => {
             if (!window.confirm("Reset test data? This deletes every vendor check and restores the 3 sample vendors.")) return;
             const r = await fetch("/api/demo/reset", { method: "POST" });
