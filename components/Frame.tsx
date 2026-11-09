@@ -98,7 +98,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
         <header className="sticky top-0 z-20 bg-[#f8f9fa]/85 backdrop-blur">
           <div className="flex items-center gap-2 px-4 py-3 lg:px-8">
             <Link href="/" className="lg:hidden"><Logo size="h-9 w-9" /></Link>
-            <div className="min-w-0 flex-1 text-sm text-slate-500"><span className="hidden sm:inline">Pages / </span><span className="font-semibold text-slate-800">{titleFor(path)}</span></div>
+            <div className="min-w-0 flex-1 text-sm text-slate-500"><span className="font-semibold text-slate-800">{titleFor(path)}</span></div>
             <form className="relative hidden sm:block" onSubmit={(e) => { e.preventDefault(); router.push(q.trim() ? `/vendors?q=${encodeURIComponent(q.trim())}` : "/vendors"); }}>
               <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a vendor or GST number" aria-label="Find a vendor" className="h-10 w-72 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#1890ff] focus:ring-2 focus:ring-indigo-100" />
