@@ -130,10 +130,10 @@ export default function RunView({ id }: { id: string }) {
           {problems.length > 0 ? (
             <>
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What needs attention</h2>
-              {problems.map((c) => <Problem key={c.id} c={c} />)}
+              {problems.map((c) => <Problem key={c.id} c={c} documents={documents} />)}
             </>
           ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">Nothing needs attention.</p>}
-          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or didn't apply · <button className="-my-2 py-2 text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
+          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or not applicable to this vendor · <button className="-my-2 py-2 text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
           {showAll && <AllChecks checks={checks} />}
         </section>
       )}
@@ -150,7 +150,7 @@ export default function RunView({ id }: { id: string }) {
       )}
 
       {!running && (
-        <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <details open={needsDecision} className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">History</summary>
           <ul className="space-y-2 px-5 pb-5 text-sm text-slate-600">
             <li>Version {submission.version} submitted · {new Date(submission.created_at).toLocaleString()}</li>
@@ -192,7 +192,7 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
   );
 }
 
-function Problem({ c }: { c: CheckResult }) {
+function Problem({ c, documents }: { c: CheckResult; documents: any[] }) {
   const [open, setOpen] = useState(false);
   const tone = c.status === "FAIL"
     ? (c.severity === "HARD_STOP" ? "border-rose-200 bg-rose-50/50" : c.severity === "REVIEW" ? "border-orange-200 bg-orange-50/50" : "border-amber-200 bg-amber-50/50")
@@ -210,6 +210,7 @@ function Problem({ c }: { c: CheckResult }) {
             <div key={i} className="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
               <div className="text-xs text-slate-500">{s.label}</div>
               <div className="mono break-all text-sm text-slate-900">{s.value}</div>
+              {(() => { const d = documents.find((x) => x.url && s.label.startsWith(SLOT_LABEL[x.slot] ?? "\u0000")); return d ? <a href={d.url} target="_blank" rel="noreferrer" className="mt-1 inline-block py-1 text-xs font-semibold text-[#1890ff] hover:underline">View document ↗</a> : null; })()}
             </div>
           ))}
         </div>
@@ -339,10 +340,16 @@ function ReviewPanel({ run, actions, onDone }: { run: any; actions: any[]; onDon
         </ul>
       ) : (
         <>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {["Checked the documents myself: the names refer to the same entity.", "Please send a bank letter on the bank's letterhead.", "Not enough evidence to approve this vendor.", "Verified with the vendor by phone."].map((t) => (
+              <button key={t} type="button" onClick={() => setReason(t)} className="rounded-full border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50">{t.replace(/\.$/, "")}</button>
+            ))}
+          </div>
           <textarea className={`${inputCls} min-h-[76px]`} placeholder="Why? (at least 10 characters)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button className={btnPrimary} disabled={busy || !ok} onClick={() => act("APPROVE")}>Approve</button>
-            <button className={btnSecondary} disabled={busy || !ok} onClick={() => act("REQUEST_INFO")}>Ask vendor for more</button>
+            {/* A flagged case needs evidence first, so asking the vendor is the default action; approving is deliberate. */}
+            <button className={btnPrimary} disabled={busy || !ok} onClick={() => act("REQUEST_INFO")}>Ask vendor for more</button>
+            <button className={btnSecondary} disabled={busy || !ok} onClick={() => act("APPROVE")}>Approve</button>
             <button className={`${btnSecondary} text-rose-700`} disabled={busy || !ok} onClick={() => act("REJECT")}>Reject</button>
           </div>
           {err && <p className="mt-2 text-sm text-rose-700">{err}</p>}

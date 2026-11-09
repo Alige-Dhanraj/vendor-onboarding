@@ -21,8 +21,8 @@ function Kpi({ label, value, sub, icon, hero }: { label: string; value: string; 
 
 export default function Dashboard() {
   const data = useRuns(8000);
-  const [manual, setManual] = useState("");
-  useEffect(() => { try { setManual(localStorage.getItem("vg_manual_minutes") ?? ""); } catch { /* ignore */ } }, []);
+  const [manual, setManual] = useState("15"); // starting assumption: 15 minutes per manual check, editable
+  useEffect(() => { try { setManual(localStorage.getItem("vg_manual_minutes") ?? "15"); } catch { /* ignore */ } }, []);
   const save = (v: string) => { setManual(v); try { localStorage.setItem("vg_manual_minutes", v); } catch { /* ignore */ } };
 
   if (!data) {
@@ -62,7 +62,7 @@ export default function Dashboard() {
         <Kpi label="Vendors checked" value={String(latest.length)} sub={`${s.total} checks in all`} icon="vendors" />
         <Kpi label="Cleared without a person" value={clear === null ? "–" : `${clear}%`} sub="No human needed" icon="check" />
         <Kpi label="Average check time" value={fmtMs(s.avg_ms) || "–"} sub="From upload to decision" icon="clock" />
-        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `Estimate, ${vendorsN} vendors`} icon="bolt" />
+        <Kpi hero label="Time saved" value={saved === null ? "–" : `${saved.toFixed(1)} h`} sub={saved === null ? "Enter minutes below" : `Estimate: ${manual} min per manual check, ${vendorsN} vendors`} icon="bolt" />
       </div>
 
       <Card className="p-4 sm:p-5">
