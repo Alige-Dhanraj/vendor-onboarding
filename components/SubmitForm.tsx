@@ -396,7 +396,7 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
 
           {demo && (
             <details className="mt-6 border-t border-slate-100 pt-4" open={demoOpen || !!scenarioId} onToggle={(e) => setDemoOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="cursor-pointer py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Demo mode · load sample data</summary>
+              <summary className="cursor-pointer py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Demo mode · load sample data</summary>
               <div className="mt-3">
               <select className={inputCls} value={scenarioId} onChange={(e) => loadScenario(e.target.value)}>
                 <option value="">Choose…</option>

@@ -21,8 +21,7 @@ export default function RunView({ id }: { id: string }) {
   const [data, setData] = useState<Bundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
-  const [showSteps, setShowSteps] = useState(false);
-  const [showAll, setShowAll] = useState(false);
+  const [tab, setTab] = useState<"summary" | "checks" | "documents" | "history">("summary");
   const [toast, setToast] = useState<string | null>(null);
   const started = useRef(false);
   const sawRunning = useRef(false);
@@ -113,10 +112,24 @@ export default function RunView({ id }: { id: string }) {
               {inactive && canDecide && <a className={btnPrimary} href="#vendor-status">Reactivate vendor</a>}
             </div>
             <div className="mt-3 text-xs text-slate-500">
-              Checked in {fmtMs(run.duration_ms)} · <button className="-my-3 px-1 py-3 underline hover:text-slate-700" onClick={() => setShowSteps((v) => !v)}>{showSteps ? "Hide steps" : "Show steps"}</button>
+              Checked in {fmtMs(run.duration_ms)} · {checks.length} checks run
             </div>
           </div>
-          {showSteps && <Card className="p-5"><Stepper events={events} running={false} /></Card>}
+          {checks.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Check results by area">
+              {["COMPLETE", "VALID", "CONSISTENT", "CREDIBLE"].map((l) => {
+                const cs = checks.filter((c: CheckResult) => c.layer === l && c.status !== "SKIPPED");
+                const bad = cs.filter((c: CheckResult) => ["FAIL", "UNVERIFIED", "WARN"].includes(c.status)).length;
+                return (
+                  <button key={l} type="button" onClick={() => setTab("checks")} className={`rounded-xl border bg-white p-3 text-left shadow-sm hover:bg-slate-50 ${bad ? "border-amber-300" : "border-slate-200"}`}>
+                    <div className="text-xs font-medium text-slate-500">{LAYER_LABEL[l]}</div>
+                    <div className={`mt-1 text-lg font-semibold ${bad ? "text-amber-700" : "text-emerald-700"}`}>{bad ? `${bad} to look at` : "All clear"}</div>
+                    <div className="text-xs text-slate-400">{cs.length - bad} of {cs.length} passed</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
@@ -125,39 +138,45 @@ export default function RunView({ id }: { id: string }) {
         : role ? <Card className="border-orange-200 p-4 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
       {!running && run.review_flag && run.review_resolved && reviewer_actions.length > 0 && <ReviewPanel run={run} actions={reviewer_actions} onDone={load} />}
 
-      {!running && checks.length > 0 && (
-        <section className="space-y-3">
-          {problems.length > 0 ? (
-            <>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What needs attention</h2>
-              {problems.map((c) => <Problem key={c.id} c={c} documents={documents} />)}
-            </>
-          ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">Nothing needs attention.</p>}
-          <p className="text-sm text-slate-500">✓ {passed} check{passed === 1 ? "" : "s"} passed or not applicable to this vendor · <button className="-my-2 py-2 text-indigo-600 hover:underline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Hide all checks" : "Show all checks"}</button></p>
-          {showAll && <AllChecks checks={checks} />}
-        </section>
-      )}
-
-      {!running && status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
-      {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
-      {message && <MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} holding={status === "MANUAL_REVIEW"} />}
-
-      {documents.length > 0 && (
-        <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">Documents ({documents.length})</summary>
-          <div className="space-y-3 px-5 pb-5"><Documents documents={documents} running={running} /></div>
-        </details>
-      )}
-
       {!running && (
-        <details open={needsDecision} className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">History</summary>
-          <ul className="space-y-2 px-5 pb-5 text-sm text-slate-600">
+        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-slate-200">
+          {([["summary", "Summary"], ["checks", `All checks (${checks.length})`], ["documents", `Documents (${documents.length})`], ["history", "History"]] as const).map(([k, l]) => (
+            <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => setTab(k)} className={`-mb-px shrink-0 border-b-2 px-4 py-3 text-sm font-semibold ${tab === k ? "border-[#1890ff] text-[#1890ff]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {!running && tab === "summary" && (
+        <div className="space-y-4">
+          {checks.length > 0 && (problems.length > 0 ? (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">What needs attention ({problems.length})</h2>
+              {problems.map((c, i) => <Problem key={c.id} c={c} documents={documents} defaultOpen={i === 0} />)}
+              <p className="text-sm text-slate-500">✓ {passed} other check{passed === 1 ? "" : "s"} passed or did not apply.</p>
+            </section>
+          ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">✓ All {checks.length} checks passed. Nothing needs attention.</p>)}
+          {status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
+          {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
+          {message && (
+            <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-700">{status === "MANUAL_REVIEW" ? "Holding note to the vendor (optional)" : "Preview the email to the vendor"}</summary>
+              <div className="px-5 pb-5"><MessageCard message={status === "PENDING_INFO" ? withLink(message, data.invite_token) : message} email={email} holding={status === "MANUAL_REVIEW"} /></div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {!running && tab === "checks" && <AllChecks checks={checks} />}
+      {!running && tab === "documents" && (documents.length > 0 ? <div className="space-y-3"><Documents documents={documents} running={false} /></div> : <p className="text-sm text-slate-500">No documents were uploaded.</p>)}
+      {!running && tab === "history" && (
+        <div className="space-y-4">
+          <ul className="space-y-2 text-sm text-slate-600">
             <li>Version {submission.version} submitted · {new Date(submission.created_at).toLocaleString()}</li>
             <li>Checked by VendorGate in {fmtMs(run.duration_ms)}</li>
             {reviewer_actions.map((a: any) => <li key={a.id}>{a.action.replace("_", " ").toLowerCase()} by {a.reviewer} · {new Date(a.created_at).toLocaleString()}: “{a.reason}”</li>)}
           </ul>
-        </details>
+          <Card className="p-5"><SectionTitle>How this was checked</SectionTitle><Stepper events={events} running={false} /></Card>
+        </div>
       )}
     </div>
   );
@@ -192,8 +211,8 @@ function Stepper({ events, running }: { events: any[]; running: boolean }) {
   );
 }
 
-function Problem({ c, documents }: { c: CheckResult; documents: any[] }) {
-  const [open, setOpen] = useState(false);
+function Problem({ c, documents, defaultOpen }: { c: CheckResult; documents: any[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(!!defaultOpen);
   const tone = c.status === "FAIL"
     ? (c.severity === "HARD_STOP" ? "border-rose-200 bg-rose-50/50" : c.severity === "REVIEW" ? "border-orange-200 bg-orange-50/50" : "border-amber-200 bg-amber-50/50")
     : "border-slate-200 bg-slate-50";
@@ -201,10 +220,11 @@ function Problem({ c, documents }: { c: CheckResult; documents: any[] }) {
     <div className={`rounded-xl border p-4 ${tone}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="font-medium text-slate-900">{PLAIN[c.id] ?? c.title}</div>
-        <button type="button" aria-label="Why we check this" onClick={() => setOpen((v) => !v)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-300 text-xs text-slate-500 hover:bg-white">i</button>
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="-my-3 shrink-0 px-1 py-3 text-xs font-semibold text-[#1890ff] hover:underline">{open ? "Hide details" : "Show details"}</button>
       </div>
       <p className="mt-1 text-sm text-slate-700">{c.reason}</p>
-      {c.sources.length > 1 && (
+      {c.next_action && <p className="mt-2 text-sm text-slate-800"><b>Next:</b> {c.next_action}</p>}
+      {open && c.sources.length > 1 && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {c.sources.map((s, i) => (
             <div key={i} className="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
@@ -215,7 +235,6 @@ function Problem({ c, documents }: { c: CheckResult; documents: any[] }) {
           ))}
         </div>
       )}
-      {c.next_action && <p className="mt-3 text-sm text-slate-800"><b>Next:</b> {c.next_action}</p>}
       {open && <div className="mt-3 space-y-1 border-t border-slate-200 pt-3 text-xs text-slate-600"><div><b>What we compared:</b> {c.checked}</div><div><b>Rule:</b> {c.rule}</div></div>}
     </div>
   );
