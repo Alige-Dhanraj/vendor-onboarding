@@ -41,14 +41,29 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
   const [menu, setMenu] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLDivElement>(null);
+  const [bell, setBell] = useState(false);
+  const [seen, setSeen] = useState<string[]>([]);
+  useEffect(() => { try { setSeen(JSON.parse(localStorage.getItem("vg_seen_runs") || "[]")); } catch { /* ignore */ } }, []);
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setMenu(false); };
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setMenu(false);
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBell(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
   const latest: any[] = data ? latestPerVendor(data.runs).filter((r: any) => r.status !== "RUNNING") : [];
-  const action = latest.filter((r) => (r.review_flag && !r.review_resolved) || effectiveStatus(r) === "PENDING_INFO").length;
+  const needsReview = latest.filter((r) => r.review_flag && !r.review_resolved);
+  const waitingVendor = latest.filter((r) => !(r.review_flag && !r.review_resolved) && effectiveStatus(r) === "PENDING_INFO");
+  const items = [...needsReview.map((r) => ({ r, kind: "review" as const })), ...waitingVendor.map((r) => ({ r, kind: "wait" as const }))];
+  // The red number counts only items you have not opened the bell for yet; opening the bell clears it.
+  const unseen = items.filter((x) => !seen.includes(x.r.id)).length;
+  const toggleBell = () => {
+    const open = !bell; setBell(open); setMenu(false);
+    if (open) { const next = [...new Set([...seen, ...items.map((x) => x.r.id)])].slice(-300); setSeen(next); try { localStorage.setItem("vg_seen_runs", JSON.stringify(next)); } catch { /* ignore */ } }
+  };
   const initials = user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
   const nav: [string, string, IconName][] = [["/", "Home", "home"], ["/vendors", "Vendors", "vendors"], ["/dashboard", "Dashboard", "chart"]];
@@ -85,10 +100,28 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a vendor or GST number" aria-label="Find a vendor" className="h-10 w-72 rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[#1890ff] focus:ring-2 focus:ring-indigo-100" />
             </form>
             <Link href="/vendors" aria-label="Find a vendor" className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-white sm:hidden"><Icon name="search" /></Link>
-            <Link href="/" aria-label={`${action} vendors need action`} title={`${action} vendor${action === 1 ? "" : "s"} need action`} className="relative grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-white">
-              <Icon name="bell" />
-              {action > 0 && <span className="absolute right-1 top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-xs font-semibold leading-none text-white">{action}</span>}
-            </Link>
+            <div className="sm:relative" ref={bellRef}>
+              <button onClick={toggleBell} aria-label={unseen ? `${unseen} new notifications` : "Notifications"} className="relative grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-white">
+                <Icon name="bell" />
+                {unseen > 0 && <span className="absolute right-1 top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-xs font-semibold leading-none text-white">{unseen}</span>}
+              </button>
+              {bell && (
+                <div className={`fixed inset-x-4 top-16 z-40 max-h-[70vh] overflow-y-auto rounded-xl border border-slate-100 bg-white p-2 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 ${SHADOW}`}>
+                  <div className="px-3 py-2 text-sm font-semibold text-slate-900">Notifications</div>
+                  {items.length === 0 && <div className="px-3 pb-4 pt-1 text-sm text-slate-500">Nothing needs you right now.</div>}
+                  {items.slice(0, 8).map(({ r, kind }) => (
+                    <Link key={r.id} href={`/runs/${r.id}`} onClick={() => setBell(false)} className="block rounded-lg px-3 py-2.5 hover:bg-slate-50">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold text-slate-900">{r.legal_name || "Unnamed vendor"}</span>
+                        <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-white ${kind === "review" ? "bg-orange-500" : "bg-amber-500"}`}>{kind === "review" ? "Needs your review" : "Waiting on vendor"}</span>
+                      </div>
+                      <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{r.headline}</div>
+                    </Link>
+                  ))}
+                  {items.length > 8 && <Link href="/vendors" onClick={() => setBell(false)} className="block px-3 py-2 text-sm font-semibold text-[#1890ff]">See all {items.length} in Vendors</Link>}
+                </div>
+              )}
+            </div>
             <div className="relative" ref={ref}>
               <button onClick={() => setMenu((v) => !v)} aria-label="Account" className="flex h-10 items-center gap-2 rounded-lg pl-1 pr-1 hover:bg-white sm:pr-2">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1890ff] text-xs font-semibold text-white">{initials}</span>
