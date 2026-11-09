@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import HelpPanel from "./HelpPanel";
 import { Icon, type IconName } from "./icons";
 import { latestPerVendor, useRuns } from "./useRuns";
-import { effectiveStatus } from "@/lib/ui-labels";
+import { effectiveStatus, fmtDateTime } from "@/lib/ui-labels";
 
 interface U { name: string; email: string; role: string }
 const ROLE: Record<string, string> = { BUYER: "Buyer", REVIEWER: "Reviewer", ADMIN: "Admin" };
@@ -57,7 +57,10 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
   const latest: any[] = data ? latestPerVendor(data.runs).filter((r: any) => r.status !== "RUNNING") : [];
   const needsReview = latest.filter((r) => r.review_flag && !r.review_resolved);
   const waitingVendor = latest.filter((r) => !(r.review_flag && !r.review_resolved) && effectiveStatus(r) === "PENDING_INFO");
-  const items = [...needsReview.map((r) => ({ r, kind: "review" as const })), ...waitingVendor.map((r) => ({ r, kind: "wait" as const }))];
+  // "Documents received": a vendor (or your team on their behalf) sent corrected documents in the last 7 days and nothing else is asking for you.
+  const weekAgo = Date.now() - 7 * 864e5;
+  const received = latest.filter((r) => r.version > 1 && !needsReview.includes(r) && !waitingVendor.includes(r) && effectiveStatus(r) !== "REJECTED" && new Date(r.started_at).getTime() >= weekAgo);
+  const items = [...needsReview.map((r) => ({ r, kind: "review" as const })), ...received.map((r) => ({ r, kind: "received" as const })), ...waitingVendor.map((r) => ({ r, kind: "wait" as const }))];
   // The red number counts only items you have not opened the bell for yet; opening the bell clears it.
   const unseen = items.filter((x) => !seen.includes(x.r.id)).length;
   const toggleBell = () => {
@@ -113,9 +116,10 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
                     <Link key={r.id} href={`/runs/${r.id}`} onClick={() => setBell(false)} className="block rounded-lg px-3 py-2.5 hover:bg-slate-50">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold text-slate-900">{r.legal_name || "Unnamed vendor"}</span>
-                        <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-white ${kind === "review" ? "bg-orange-500" : "bg-amber-500"}`}>{kind === "review" ? "Needs your review" : "Waiting on vendor"}</span>
+                        <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-white ${kind === "review" ? "bg-orange-500" : kind === "received" ? "bg-[#1890ff]" : "bg-amber-500"}`}>{kind === "review" ? "Needs your review" : kind === "received" ? "Documents received" : "Waiting on vendor"}</span>
                       </div>
                       <div className="mt-0.5 line-clamp-2 text-xs text-slate-500">{r.headline}</div>
+                      <div className="mt-0.5 text-xs text-slate-400">{r.version > 1 ? "Documents received" : "Submitted"} {fmtDateTime(r.started_at)}</div>
                     </Link>
                   ))}
                   {items.length > 8 && <Link href="/vendors" onClick={() => setBell(false)} className="block px-3 py-2 text-sm font-semibold text-[#1890ff]">See all {items.length} in Vendors</Link>}

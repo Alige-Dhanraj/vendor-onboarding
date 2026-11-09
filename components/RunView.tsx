@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CheckResult } from "@/lib/engine/types";
-import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtMs, mailtoLink, plainText } from "@/lib/ui-labels";
+import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtDateTime, fmtMs, mailtoLink, plainText } from "@/lib/ui-labels";
 import { Card, CheckBadge, Pill, SectionTitle, StatusBadge, btnPrimary, btnSecondary, inputCls } from "./ui";
 
 type Bundle = any; // shape of GET /api/runs/:id
@@ -101,6 +101,10 @@ export default function RunView({ id }: { id: string }) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{form.legal_name || "Unnamed vendor"}</h1>
         <div className="mt-1 text-sm text-slate-500">{[form.contact?.name, email].filter(Boolean).join(" · ")}</div>
+        <div className="mt-1 text-xs text-slate-500">
+          {submission.version > 1 ? "Documents received" : "Submitted"} {fmtDateTime(submission.created_at)}
+          {!running && status === "APPROVED" && run.finished_at && <> · <b className="text-emerald-700">Onboarded {fmtDateTime(run.finished_at)}</b></>}
+        </div>
       </div>
 
       {running ? (
@@ -168,7 +172,7 @@ export default function RunView({ id }: { id: string }) {
               <p className="text-sm text-slate-500">✓ {passed} other check{passed === 1 ? "" : "s"} passed or did not apply.</p>
             </section>
           ) : <p className="rounded-xl border border-emerald-200 bg-white p-4 text-sm text-slate-700">✓ All {checks.length} checks passed. Nothing needs attention.</p>)}
-          {status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} />}
+          {status === "APPROVED" && <RecordCard id={run.id} form={form} actions={reviewer_actions} at={run.finished_at} />}
           {vendor && status === "APPROVED" && <div id="vendor-status" className="scroll-mt-24"><VendorLifecycle id={run.id} vendor={vendor} canDecide={canDecide} onDone={load} /></div>}
           {message && (
             <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -414,7 +418,7 @@ function ResultToast({ status }: { status: string }) {
   );
 }
 
-function RecordCard({ id, form, actions }: { id: string; form: any; actions: any[] }) {
+function RecordCard({ id, form, actions, at }: { id: string; form: any; actions: any[]; at?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [connected, setConnected] = useState(false);
@@ -427,6 +431,7 @@ function RecordCard({ id, form, actions }: { id: string; form: any; actions: any
     ["Bank account holder", form.bank.account_holder], ["Account", form.bank.account_number], [us ? "Routing number" : "IFSC", (us ? form.bank.routing_number : form.bank.ifsc) ?? ""],
     ["Address", [form.address.street, form.address.city, form.address.state, form.address.postal_code].filter(Boolean).join(", ")],
     ["Contact", [form.contact.name, form.contact.email, form.contact.phone].filter(Boolean).join(" · ")],
+    ...(at ? ([["Onboarded on", fmtDateTime(at)]] as [string, string][]) : []),
   ];
   async function send() {
     setBusy(true); setNote(null);

@@ -10,7 +10,7 @@ export interface ExportRecord {
   bank_account_holder: string; bank_account_last4: string; ifsc: string; routing_number: string;
   street: string; city: string; state: string; postal_code: string;
   contact_name: string; contact_email: string; contact_phone: string; alt_phone: string;
-  verified_at: string; verified_by: string; run_id: string; version: number;
+  submitted_at: string; verified_at: string; verified_by: string; run_id: string; version: number;
   status: "Active" | "Inactive"; inactive_reason: string;
 }
 
@@ -26,6 +26,7 @@ export function buildRecord(b: RunBundle): ExportRecord {
     ifsc: f.bank.ifsc ?? "", routing_number: f.bank.routing_number ?? "",
     street: f.address.street, city: f.address.city, state: f.address.state, postal_code: f.address.postal_code,
     contact_name: f.contact.name, contact_email: f.contact.email, contact_phone: f.contact.phone, alt_phone: f.contact.alt_phone ?? "",
+    submitted_at: b.submission.created_at,
     verified_at: b.run.finished_at ?? b.run.started_at,
     verified_by: approver ? approver.reviewer : "VendorGate automatic checks",
     run_id: b.run.id, version: b.submission.version,
@@ -41,7 +42,7 @@ const esc = (v: unknown) => {
 };
 const COLUMNS: (keyof ExportRecord)[] = [
   "vendor_ref", "legal_name", "trade_name", "entity_type", "country", "pan", "gstin", "ein", "bank_account_holder", "bank_account_last4", "ifsc", "routing_number",
-  "street", "city", "state", "postal_code", "contact_name", "contact_email", "contact_phone", "alt_phone", "verified_at", "verified_by", "run_id", "version", "status", "inactive_reason",
+  "street", "city", "state", "postal_code", "contact_name", "contact_email", "contact_phone", "alt_phone", "submitted_at", "verified_at", "verified_by", "run_id", "version", "status", "inactive_reason",
 ];
 export function recordsCsv(rs: ExportRecord[]): string {
   return `${COLUMNS.join(",")}\n${rs.map((r) => COLUMNS.map((k) => esc(r[k])).join(",")).join("\n")}${rs.length ? "\n" : ""}`;

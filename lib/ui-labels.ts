@@ -64,6 +64,14 @@ export const fmtMs = (ms?: number | null) => (ms == null ? "" : ms < 1000 ? `${m
 export const effectiveStatus = (r: { status: string; final_status?: string | null; internal_status?: string | null }) =>
   r.status === "RUNNING" ? "RUNNING" : r.status === "FAILED" ? "FAILED" : (r.final_status ?? r.internal_status ?? "RUNNING");
 
+/** Exact date and time, e.g. "9 Nov 2026, 7:25 pm" (in the viewer's own time zone). */
+export function fmtDateTime(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}, ${d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).replace(/\b(am|pm)\b/i, (m) => m.toLowerCase())}`;
+}
+
 export function ago(iso: string) {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
   if (s < 60) return "just now";

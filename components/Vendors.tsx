@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { ago, listStatus } from "@/lib/ui-labels";
+import { fmtDateTime, listStatus } from "@/lib/ui-labels";
 import { Icon } from "./icons";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { StatusBadge, inputCls } from "./ui";
 
-const TABS: [string, string][] = [["all", "All"], ["review", "Needs review"], ["PENDING_INFO", "Waiting"], ["APPROVED", "Approved"], ["REJECTED", "Rejected"], ["INACTIVE", "Inactive"]];
-const COLS = "sm:grid-cols-[minmax(0,2fr)_minmax(0,2.4fr)_180px_90px]";
+const TABS: [string, string][] = [["all", "All"], ["review", "Needs review"], ["received", "Documents received"], ["PENDING_INFO", "Waiting"], ["APPROVED", "Approved"], ["REJECTED", "Rejected"], ["INACTIVE", "Inactive"]];
+const COLS = "sm:grid-cols-[minmax(0,2fr)_minmax(0,2.4fr)_180px_150px]";
 
 export default function Vendors() {
   const params = useSearchParams();
@@ -20,6 +20,7 @@ export default function Vendors() {
   const match = (r: any, f: string) => {
     const st = listStatus(r);
     if (f === "all") return q ? true : st !== "INACTIVE"; // inactive vendors stay out of the way unless searched for
+    if (f === "received") return r.version > 1 && r.status !== "RUNNING" && st !== "INACTIVE";
     if (f === "review") return r.review_flag && !r.review_resolved && r.status !== "RUNNING";
     return st === f;
   };
@@ -55,7 +56,7 @@ export default function Vendors() {
           </div>
         </div>
 
-        <div className={`label hidden border-b border-slate-100 px-5 py-3 text-slate-500 sm:grid ${COLS} gap-4`}><span>Vendor</span><span>What is happening</span><span>Status</span><span className="text-right">Updated</span></div>
+        <div className={`label hidden border-b border-slate-100 px-5 py-3 text-slate-500 sm:grid ${COLS} gap-4`}><span>Vendor</span><span>What is happening</span><span>Status</span><span className="text-right">Date and time</span></div>
         {!data ? (
           <div className="space-y-3 p-5">{[0, 1, 2, 3].map((i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />)}</div>
         ) : rows.length === 0 ? (
@@ -67,11 +68,11 @@ export default function Vendors() {
                 <Link href={`/runs/${r.id}`} className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-slate-50 sm:px-5 ${COLS}`}>
                   <div className="min-w-0">
                     <div className="font-semibold text-slate-900 sm:truncate">{r.legal_name || "Unnamed vendor"}</div>
-                    <div className="truncate text-sm text-slate-500">{r.contact_email || r.gstin || ""}</div>
+                    <div className="truncate text-sm text-slate-500">{r.contact_email || r.gstin || ""}<span className="sm:hidden"> · {fmtDateTime(r.started_at)}</span></div>
                   </div>
                   <div className="order-3 col-span-2 text-sm text-slate-600 sm:order-none sm:col-span-1">{r.headline ?? "Checking…"}</div>
                   <div className="justify-self-end sm:justify-self-start"><StatusBadge status={listStatus(r)} /></div>
-                  <div className="hidden text-right text-xs text-slate-400 sm:block">{ago(r.started_at)}</div>
+                  <div className="hidden text-right text-xs text-slate-500 sm:block">{fmtDateTime(r.started_at)}{r.version > 1 && <div className="font-semibold text-[#1677ff]">Documents received</div>}</div>
                 </Link>
               </li>
             ))}

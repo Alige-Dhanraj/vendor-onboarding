@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ago, effectiveStatus, fmtMs, waiting } from "@/lib/ui-labels";
+import { ago, effectiveStatus, fmtDateTime, fmtMs, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { Icon, type IconName } from "./icons";
 import { Card, SectionTitle, StatusBadge } from "./ui";
@@ -128,7 +128,7 @@ export default function Dashboard() {
         <SectionTitle hint="Latest checks">Recent activity</SectionTitle>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead><tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500"><th className="py-2 pr-3 font-semibold">Vendor</th><th className="py-2 pr-3 font-semibold">Status</th><th className="hidden py-2 pr-3 font-semibold md:table-cell">Outcome</th><th className="hidden py-2 pr-3 font-semibold sm:table-cell">Checked in</th><th className="py-2 text-right font-semibold">When</th></tr></thead>
+            <thead><tr className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500"><th className="py-2 pr-3 font-semibold">Vendor</th><th className="py-2 pr-3 font-semibold">Status</th><th className="hidden py-2 pr-3 font-semibold md:table-cell">Outcome</th><th className="hidden py-2 pr-3 font-semibold sm:table-cell">Checked in</th><th className="py-2 text-right font-semibold">Date and time</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {done.slice(0, 8).map((r: any) => (
                 <tr key={r.id} className="hover:bg-slate-50">
@@ -136,7 +136,7 @@ export default function Dashboard() {
                   <td className="py-2.5 pr-3"><StatusBadge status={effectiveStatus(r)} /></td>
                   <td className="hidden max-w-xs truncate py-2.5 pr-3 text-slate-600 md:table-cell">{r.headline}</td>
                   <td className="hidden py-2.5 pr-3 tabular-nums text-slate-600 sm:table-cell">{fmtMs(r.duration_ms) || "–"}</td>
-                  <td className="whitespace-nowrap py-2.5 text-right text-slate-500">{ago(r.started_at)}</td>
+                  <td className="whitespace-nowrap py-2.5 text-right text-slate-600">{fmtDateTime(r.started_at)}<div className="text-xs text-slate-400">{ago(r.started_at)}</div></td>
                 </tr>
               ))}
             </tbody>
