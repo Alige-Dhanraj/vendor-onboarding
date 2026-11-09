@@ -150,6 +150,7 @@ export default function RunView({ id }: { id: string }) {
         </>
       )}
 
+      {!running && data.previous && <WhatChanged prev={data.previous} checks={checks} running={false} />}
       {needsDecision && (canDecide
         ? <div id="decide" className="scroll-mt-24"><ReviewPanel run={run} actions={reviewer_actions} onDone={load} /></div>
         : role ? <Card className="border-orange-200 p-4 text-sm text-slate-700">A reviewer needs to decide this case. Their decision will show here.</Card> : null)}
@@ -196,6 +197,30 @@ export default function RunView({ id }: { id: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function WhatChanged({ prev, checks, running }: { prev: any; checks: CheckResult[]; running: boolean }) {
+  if (!prev) return null;
+  const bad = (c: CheckResult) => ["FAIL", "UNVERIFIED", "WARN"].includes(c.status);
+  const now = new Set(checks.filter(bad).map((c) => c.id));
+  const fixed = prev.problems.filter((p: any) => !now.has(p.id));
+  const open = prev.problems.filter((p: any) => now.has(p.id));
+  const fresh = checks.filter((c) => bad(c) && !prev.problems.some((p: any) => p.id === c.id));
+  const slots = (prev.new_slots as string[]).map((x) => SLOT_LABEL[x as keyof typeof SLOT_LABEL] ?? x);
+  return (
+    <Card className="p-5">
+      <SectionTitle hint={`Compared with the check on ${fmtDateTime(prev.at)}`}>What changed since the last check</SectionTitle>
+      {slots.length > 0 && <p className="mb-3 text-sm text-slate-700">New documents received: <b>{slots.join(", ")}</b>. They were read and every check was run again automatically.</p>}
+      {running ? <p className="text-sm text-slate-500">Re-checking now…</p> : (
+        <ul className="space-y-1.5 text-sm">
+          {fixed.map((p: any) => <li key={p.id} className="text-emerald-700">✓ Fixed: {PLAIN[p.id] ?? p.title}</li>)}
+          {open.map((p: any) => <li key={p.id} className="text-amber-700">• Still open: {PLAIN[p.id] ?? p.title}</li>)}
+          {fresh.map((c) => <li key={c.id} className="text-rose-700">! New issue: {PLAIN[c.id] ?? c.title}</li>)}
+          {!fixed.length && !open.length && !fresh.length && <li className="text-slate-600">Nothing was flagged before or now.</li>}
+        </ul>
+      )}
+    </Card>
   );
 }
 
