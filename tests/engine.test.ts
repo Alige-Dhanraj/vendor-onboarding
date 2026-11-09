@@ -400,3 +400,13 @@ test("submit turns non-text nested fields into text instead of crashing", async 
   assert.equal((sub.form_data as any).contact.name, "");
   assert.equal((sub.form_data as any).tax.pan, "5");
 });
+
+test("R5 never expires a PAN card, even if a date was wrongly read from it", async () => {
+  const { runChecks } = await import("../lib/engine/checks");
+  const sc = SCENARIOS[0];
+  const ctx = ctxFor(sc);
+  ctx.docs = ctx.docs.map((d) => (d.slot === "PAN_CARD" ? { ...d, fields: { ...d.fields, valid_until: "01/01/2015" }, confidence: { ...d.confidence, valid_until: 0.99 } } : d));
+  ctx.today = "2026-11-09";
+  const r5 = runChecks(ctx).find((r) => r.id === "R5")!;
+  assert.notEqual(r5.status, "FAIL");
+});

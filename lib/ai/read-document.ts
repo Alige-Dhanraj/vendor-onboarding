@@ -31,7 +31,7 @@ Classify the document and extract fields exactly as printed. Rules:
 - For each field give the value exactly as printed (no corrections, no guessing) and your confidence 0-1. Use null with confidence 0 if the field is absent or you cannot read it.
 - legal_name: the entity or person name the document is issued to. account_holder: the name on the bank account.
 - For a GST certificate also read: trade_name (if printed, else null), constitution (the "Constitution of Business" text exactly, e.g. Private Limited Company), and the principal place of business address split into address_street (everything before the city), address_city and address_pincode (6 digits).
-- valid_until: only if the document prints a validity or expiry period, the END date exactly as printed (e.g. 31/03/2026). Use null if it says "Not Applicable", is open-ended or prints no end date.
+- valid_until: only for a GST certificate, and only if it prints a validity or expiry period. Always null for a PAN card (it never expires), EIN notice and bank proof. Never use a date of birth, date of incorporation, issue date or registration date, the END date exactly as printed (e.g. 31/03/2026). Use null if it says "Not Applicable", is open-ended or prints no end date.
 - Copy IDs character by character: PAN (10 chars), GSTIN (15 chars), IFSC (11 chars), account number (digits only), EIN.
 - Documents in this demo are marked SAMPLE; that is expected. Read them normally.`;
 

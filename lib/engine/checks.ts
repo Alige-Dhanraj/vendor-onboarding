@@ -499,11 +499,11 @@ export function parseDocDate(s: string): Date | null {
 }
 
 function r5(ctx: CheckContext): CheckResult {
-  const b: Base = { id: "R5", layer: "CREDIBLE", title: "Documents are still valid", checked: "Any validity or expiry date printed on the documents", rule: "R5: a document whose printed validity has ended must be replaced. Documents with no end date (most GST certificates and PAN cards) are not affected. Dates are read day-first (DD/MM/YYYY); a date that cannot be read is not guessed." };
+  const b: Base = { id: "R5", layer: "CREDIBLE", title: "Documents are still valid", checked: "Any validity or expiry date printed on the documents", rule: "R5: a document whose printed validity has ended must be replaced. Only the GST certificate is checked, because a PAN card, EIN notice and bank letter never expire, and a GST certificate usually has no end date either. Dates are read day-first (DD/MM/YYYY); a date that cannot be read is not guessed." };
   const ref = (ctx.today && parseDocDate(ctx.today)) || new Date();
   const todayStart = Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate());
   const dated = ctx.docs
-    .filter((d) => usable(ctx, d) && d.fields.valid_until && (d.confidence.valid_until ?? d.overall_confidence) >= ctx.confidenceThreshold)
+    .filter((d) => usable(ctx, d) && d.slot === "GST_CERTIFICATE" && d.fields.valid_until && (d.confidence.valid_until ?? d.overall_confidence) >= ctx.confidenceThreshold)
     .map((d) => ({ d, raw: d.fields.valid_until!, date: parseDocDate(d.fields.valid_until!) }))
     .filter((x) => x.date);
   if (!dated.length) return result(b, "SKIPPED", null, { reason: "No document shows an end date." });
