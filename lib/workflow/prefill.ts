@@ -4,7 +4,7 @@ import { getStore } from "@/lib/store";
 import { aiEnabled, aiModel } from "@/lib/ai/openai";
 import { readDocument } from "@/lib/ai/read-document";
 import { readCacheKey, sha256 } from "@/lib/workflow/run";
-import { ALLOWED_MIME, MAX_FILE_BYTES, SLOTS } from "@/lib/workflow/intake";
+import { MAX_FILE_BYTES, SLOTS, sniffMime } from "@/lib/workflow/intake";
 import { SCENARIOS } from "@/lib/scenarios";
 import { isKnownSample } from "@/lib/ai/known-samples";
 import { fixFixedPositions, gstinPan, gstinState } from "@/lib/engine/ids";
@@ -24,11 +24,13 @@ export async function prefillFromFormData(fd: FormData) {
   const files = [...fd.entries()].filter(([k, v]) => k.startsWith("file") && typeof v !== "string").map(([, v]) => v as File).slice(0, 5);
   const store = getStore();
   const readings = await Promise.all(files.map(async (f) => {
-    if (!ALLOWED_MIME.includes(f.type) || f.size > MAX_FILE_BYTES) return { name: f.name, doc_type: "OTHER", reading: null as ExtractedDoc | null };
+    if (f.size > MAX_FILE_BYTES) return { name: f.name, doc_type: "OTHER", reading: null as ExtractedDoc | null };
     const bytes = new Uint8Array(await f.arrayBuffer());
+    const realMime = sniffMime(bytes); // the file's own first bytes, not the type the browser claimed
+    if (!realMime) return { name: f.name, doc_type: "OTHER", reading: null as ExtractedDoc | null };
     let reading: ExtractedDoc | null = null;
     if (aiEnabled()) {
-      try { reading = await readDocument({ slot: null, fileName: f.name, mime: f.type, bytes }); } catch { reading = null; }
+      try { reading = await readDocument({ slot: null, fileName: f.name, mime: realMime, bytes }); } catch { reading = null; }
     } else reading = offlineReading(f.name, sha256(bytes));
     if (reading && SLOTS.includes(reading.doc_type as DocSlot)) {
       await store.cacheSet(readCacheKey(reading.doc_type, sha256(bytes)), { ...reading, slot: reading.doc_type }, aiEnabled() ? aiModel() : "offline");

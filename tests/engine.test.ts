@@ -376,3 +376,12 @@ test("uploads are checked by their first bytes, not by the name or type the brow
   assert.equal(sniffMime(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), "image/jpeg");
   assert.equal(sniffMime(new TextEncoder().encode("<html>not a pdf</html>")), null);
 });
+
+test("intake rejects a form without legal name, country, or with a non-object section", async () => {
+  const { validateIncoming } = await import("../lib/workflow/intake");
+  const ok = { legal_name: "A Pvt Ltd", country: "IN", address: {}, contact: {}, tax: {}, bank: {} } as any;
+  assert.doesNotThrow(() => validateIncoming(ok, []));
+  assert.throws(() => validateIncoming({} as any, []), /Legal name/);
+  assert.throws(() => validateIncoming({ ...ok, country: "" }, []), /Country/);
+  assert.throws(() => validateIncoming({ ...ok, tax: "x" }, []), /tax/);
+});

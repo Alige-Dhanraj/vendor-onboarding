@@ -25,7 +25,13 @@ export function sniffMime(b: Uint8Array): string | null {
 }
 
 export function validateIncoming(form: SubmissionForm, files: IncomingFile[]) {
-  if (!form || typeof form !== "object") throw new IntakeError("Missing form data.");
+  if (!form || typeof form !== "object" || Array.isArray(form)) throw new IntakeError("Missing form data.");
+  if (typeof form.legal_name !== "string" || !form.legal_name.trim()) throw new IntakeError("Legal name is required.");
+  if (form.country !== "IN" && form.country !== "US") throw new IntakeError("Country must be India (IN) or United States (US).");
+  for (const k of ["address", "contact", "tax", "bank"] as const) {
+    const v = (form as unknown as Record<string, unknown>)[k];
+    if (v != null && (typeof v !== "object" || Array.isArray(v))) throw new IntakeError(`The "${k}" section is not valid.`);
+  }
   if (files.length > MAX_FILES) throw new IntakeError(`At most ${MAX_FILES} files.`);
   for (const f of files) {
     if (!SLOTS.includes(f.slot)) throw new IntakeError(`Unknown document slot: ${f.slot}`);

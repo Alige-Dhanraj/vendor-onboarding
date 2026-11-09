@@ -12,7 +12,7 @@ const JSON_SCHEMA = {
   properties: { verdict: { type: "string", enum: ["SAME", "DIFFERENT", "UNSURE"] }, reason: { type: "string" } },
 };
 
-const INSTRUCTIONS = `You compare two business or person names from vendor onboarding documents in India.
+const INSTRUCTIONS = `You compare two business or person names from vendor onboarding documents (India or the United States).
 Decide whether they refer to the SAME legal entity, a DIFFERENT one, or you are UNSURE.
 - SAME only for formatting or abbreviation differences: punctuation, Pvt/Private, Ltd/Limited, Co/Company, "Comp." for Components, "Engg" for Engineering, initials for spelled-out words, word order of suffixes.
 - DIFFERENT when the distinctive words differ (e.g. a different company or a person's name vs a company).

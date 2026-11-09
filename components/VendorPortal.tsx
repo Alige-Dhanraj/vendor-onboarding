@@ -66,7 +66,7 @@ export default function VendorPortal({ token }: { token: string }) {
         </div>
       );
     case "CHECKING":
-      return <Notice tone="slate" title="We're checking your details"><p>This takes about a minute. You can close this page and open the same link later.</p></Notice>;
+      return <Notice tone="slate" title="We're checking your details"><p>This usually takes under a minute. You can close this page and open the same link later.</p></Notice>;
     case "IN_REVIEW":
       return <Notice tone="slate" title="Thank you, we have everything"><p>Our team is taking a quick look. We will email you at {view.contact_email} if we need anything else.</p></Notice>;
     case "APPROVED":
