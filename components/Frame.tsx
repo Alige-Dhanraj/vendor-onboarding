@@ -64,9 +64,11 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
   const items = [...needsReview.map((r) => ({ r, kind: "review" as const })), ...received.map((r) => ({ r, kind: "received" as const })), ...waitingVendor.map((r) => ({ r, kind: "wait" as const }))];
   // The red number counts only items you have not opened the bell for yet; opening the bell clears it.
   const unseen = items.filter((x) => !seen.includes(x.r.id)).length;
+  // What the panel shows: only items not seen before. Once the bell has been opened they are marked seen and gone next time.
+  const [panel, setPanel] = useState<typeof items>([]);
   const toggleBell = () => {
     const open = !bell; setBell(open); setMenu(false);
-    if (open) { const next = [...new Set([...seen, ...items.map((x) => x.r.id)])].slice(-300); setSeen(next); try { localStorage.setItem("vg_seen_runs", JSON.stringify(next)); } catch { /* ignore */ } }
+    if (open) { setPanel(items.filter((x) => !seen.includes(x.r.id))); const next = [...new Set([...seen, ...items.map((x) => x.r.id)])].slice(-300); setSeen(next); try { localStorage.setItem("vg_seen_runs", JSON.stringify(next)); } catch { /* ignore */ } }
   };
   const initials = user.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
   const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
@@ -112,8 +114,8 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
               {bell && (
                 <div className={`fixed inset-x-4 top-16 z-40 max-h-[70vh] overflow-y-auto rounded-xl border border-slate-100 bg-white p-2 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 ${SHADOW}`}>
                   <div className="px-3 py-2 text-sm font-semibold text-slate-900">Notifications</div>
-                  {items.length === 0 && <div className="px-3 pb-4 pt-1 text-sm text-slate-500">Nothing needs you right now.</div>}
-                  {items.slice(0, 8).map(({ r, kind }) => (
+                  {panel.length === 0 && <div className="px-3 pb-4 pt-1 text-sm text-slate-500">You are all caught up. Open <Link href="/" onClick={() => setBell(false)} className="font-semibold text-[#1890ff] hover:underline">Home</Link> to see everything that needs action.</div>}
+                  {panel.slice(0, 8).map(({ r, kind }) => (
                     <Link key={r.id} href={`/runs/${r.id}`} onClick={() => setBell(false)} className="block rounded-lg px-3 py-2.5 hover:bg-slate-50">
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-semibold text-slate-900">{r.legal_name || "Unnamed vendor"}</span>
@@ -123,7 +125,7 @@ function Shell({ user, path, children }: { user: U; path: string; children: Reac
                       <div className="mt-0.5 text-xs text-slate-400">{r.version > 1 ? "Documents received" : "Submitted"} {fmtDateTime(r.started_at)}</div>
                     </Link>
                   ))}
-                  {items.length > 8 && <Link href="/vendors" onClick={() => setBell(false)} className="block px-3 py-2 text-sm font-semibold text-[#1890ff]">See all {items.length} in Vendors</Link>}
+                  {panel.length > 8 && <Link href="/vendors" onClick={() => setBell(false)} className="block px-3 py-2 text-sm font-semibold text-[#1890ff]">See all {panel.length} in Vendors</Link>}
                 </div>
               )}
             </div>
