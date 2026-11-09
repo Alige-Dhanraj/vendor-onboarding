@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { reminderMessage } from "@/lib/engine/message";
+import SendVia from "./SendVia";
 import { effectiveStatus, fmtDateTime, homeLine, listStatus, mailtoLink, waiting } from "@/lib/ui-labels";
 import { latestPerVendor, useRuns } from "./useRuns";
 import { Icon, type IconName } from "./icons";
@@ -50,7 +51,11 @@ export default function Home({ firstName }: { firstName: string }) {
       </div>
 
       <div className="rounded-xl border border-slate-100 bg-white shadow-[0_20px_27px_rgba(0,0,0,0.05)]">
-        <div className="border-b border-slate-100 px-5 py-4"><div className="font-bold">Needs action</div><div className="text-sm text-slate-500">Vendors that are waiting for you or for the vendor</div></div>
+        <div className="rounded-t-xl border-b border-slate-200 bg-slate-50 px-5 py-4">
+          <div className="flex items-center gap-2"><h2 className="text-lg font-bold tracking-tight text-slate-900">Needs action</h2>{latest && <span className="rounded-full bg-slate-900 px-2.5 py-0.5 text-xs font-semibold text-white">{todo.length}</span>}</div>
+          <div className="text-sm text-slate-500">Vendors waiting for you, or for the vendor to reply</div>
+        </div>
+        <div className="label hidden gap-3 border-b border-slate-100 px-5 py-2 text-xs uppercase tracking-wide text-slate-400 sm:flex"><div className="flex min-w-0 flex-1 gap-4"><span className="flex-1">Vendor</span><span className="w-36 text-right">Date and time</span><span className="w-44">Status</span></div><span className="w-36 text-center">Action</span></div>
         {!latest ? (
           <div className="space-y-3 p-5">{[0, 1, 2].map((i) => <div key={i} className="h-10 animate-pulse rounded-md bg-slate-100" />)}</div>
         ) : todo.length === 0 ? (
@@ -74,7 +79,7 @@ export default function Home({ firstName }: { firstName: string }) {
                   </Link>
                   {kind === "review"
                     ? <Link href={`/runs/${r.id}`} className={`${rowBtn} sm:w-36 sm:justify-center`}>Review</Link>
-                    : <a href={mailtoLink(r.contact_email, reminderMessage(r.contact_name))} className={`${rowBtn} sm:w-36 sm:justify-center`}>Send reminder</a>}
+                    : <SendVia label="Send reminder" vendor={r.legal_name} email={r.contact_email} phone={r.contact_phone} message={reminderMessage(r.contact_name)} className={`${rowBtn} sm:w-36 sm:justify-center`} />}
                 </li>
               );
             })}

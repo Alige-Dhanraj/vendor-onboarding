@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { CheckResult } from "@/lib/engine/types";
 import { LAYER_LABEL, PLAIN, SLOT_LABEL, STAGES, effectiveStatus, fmtDateTime, fmtMs, mailtoLink, plainText } from "@/lib/ui-labels";
+import SendVia from "./SendVia";
 import { Card, CheckBadge, Pill, SectionTitle, StatusBadge, btnPrimary, btnSecondary, inputCls } from "./ui";
 
 type Bundle = any; // shape of GET /api/runs/:id
@@ -121,7 +122,7 @@ export default function RunView({ id }: { id: string }) {
             <div className="mt-4 flex flex-wrap gap-2">
               {run.status === "FAILED" && <RetryButton id={run.id} />}
               {status === "APPROVED" && !inactive && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send approval note</a>}
-              {status === "PENDING_INFO" && message && <a className={btnPrimary} href={mailtoLink(email, withLink(message, data.invite_token))}>Send to vendor</a>}
+              {status === "PENDING_INFO" && message && <SendVia label="Send to vendor" vendor={form.legal_name} email={email} phone={form.contact?.phone} message={withLink(message, data.invite_token)} className={btnPrimary} />}
               {status === "REJECTED" && message && <a className={btnPrimary} href={mailtoLink(email, message)}>Send notice</a>}
               {needsDecision && canDecide && <a className={btnPrimary} href="#decide">Review and decide</a>}
               {status === "PENDING_INFO" && (submission.scenario_id ? <Link className={btnSecondary} href={resubmit}>Add corrected documents</Link> : <CorrectDocs token={data.invite_token} vendorRef={submission.vendor_ref} name={form.contact?.name} email={form.contact?.email} />)}

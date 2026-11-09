@@ -92,7 +92,7 @@ export function createMemoryStore(seed: { vendors: VendorRecord[]; blocklist: Bl
     async listRuns(limit = 100) {
       return [...runs].reverse().slice(0, limit).map((r) => {
         const s = subs.find((x) => x.id === r.submission_id)!;
-        return { ...r, vendor_ref: s.vendor_ref, legal_name: s.form_data.legal_name, version: s.version, scenario_id: s.scenario_id, gstin: s.form_data.tax.gstin ?? null, contact_name: s.form_data.contact.name, contact_email: s.form_data.contact.email, inactive: isInactive(r.id) };
+        return { ...r, vendor_ref: s.vendor_ref, legal_name: s.form_data.legal_name, version: s.version, scenario_id: s.scenario_id, gstin: s.form_data.tax.gstin ?? null, contact_name: s.form_data.contact.name, contact_email: s.form_data.contact.email, contact_phone: s.form_data.contact.phone ?? "", inactive: isInactive(r.id) };
       });
     },
     async addReviewerAction(a) {

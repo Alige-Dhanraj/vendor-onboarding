@@ -126,7 +126,7 @@ export function createSupabaseStore(url: string, serviceKey: string): Store {
       const off = await db.from("vendor_master").select("source_run_id").eq("active", false);
       const inactiveRuns = new Set(((off.data as any[] | null) ?? []).map((x) => x.source_run_id));
       return rows.map(({ submissions: s, ...r }) => ({
-        ...r, inactive: inactiveRuns.has(r.id), vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null, contact_name: s?.form_data?.contact?.name ?? "", contact_email: s?.form_data?.contact?.email ?? "",
+        ...r, inactive: inactiveRuns.has(r.id), vendor_ref: s?.vendor_ref ?? "", version: s?.version ?? 1, scenario_id: s?.scenario_id ?? null, legal_name: s?.form_data?.legal_name ?? "", gstin: s?.form_data?.tax?.gstin ?? null, contact_name: s?.form_data?.contact?.name ?? "", contact_email: s?.form_data?.contact?.email ?? "", contact_phone: s?.form_data?.contact?.phone ?? "",
       })) as RunListItem[];
     },
     async addReviewerAction(a) {

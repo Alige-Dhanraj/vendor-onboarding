@@ -88,5 +88,14 @@ export function waiting(iso: string) {
 
 /** Messages mark bold with **double asterisks**; emails and copy use plain text. */
 export const plainText = (t: string) => t.replace(/\*\*/g, "");
+/** Digits for a wa.me link: a bare 10-digit number is taken as Indian; anything else is used as typed (country code included). */
+export function waNumber(raw?: string | null) {
+  let d = (raw ?? "").replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  if (d.length === 10) d = "91" + d;
+  return d.length >= 11 && d.length <= 15 ? d : "";
+}
+export const whatsappLink = (phone: string | undefined | null, m: { body: string }) =>
+  `https://wa.me/${waNumber(phone)}?text=${encodeURIComponent(plainText(m.body))}`;
 export const mailtoLink = (email: string | undefined, m: { subject: string; body: string }) =>
   `mailto:${encodeURIComponent(email ?? "")}?subject=${encodeURIComponent(plainText(m.subject))}&body=${encodeURIComponent(plainText(m.body))}`;
