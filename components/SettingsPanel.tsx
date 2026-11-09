@@ -48,7 +48,7 @@ export default function SettingsPanel({ users, accountingHost }: { users: { name
         <ul className="divide-y divide-slate-100 text-sm">
           {users.map((u) => <li key={u.email} className="flex items-center justify-between py-2"><span><b>{u.name}</b> <span className="text-slate-500">{u.email}</span></span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs">{u.role[0] + u.role.slice(1).toLowerCase()}</span></li>)}
         </ul>
-        <p className="mt-3 text-xs text-slate-500">Adding and removing people comes next.</p>
+        <p className="mt-3 text-xs text-slate-500">Team accounts are set up by your company administrator. In this demo they are fixed, so you can try each role.</p>
       </Card>
 
       <Card className="p-5">
