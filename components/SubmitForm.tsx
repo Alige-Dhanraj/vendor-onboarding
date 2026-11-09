@@ -186,6 +186,12 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
     return d.length === 10 ? "91" + d : d; // a bare 10-digit number is taken as Indian
   })();
   const contactOk = contactIsEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reqEmail.trim()) : waDigits.length >= 11 && waDigits.length <= 15;
+  // Enter in either box creates the link (and must not submit the whole vendor form behind it).
+  const onLinkEnter = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (!linkBusy && reqName.trim() && contactOk) createLink();
+  };
   async function createLink() {
     setLinkBusy(true); setLinkError(null); setLink("");
     try {
@@ -313,8 +319,8 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
               {reqOpen && (
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                    <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} /></Field>
-                    <Field label="Vendor email or WhatsApp number"><input className={inputCls} inputMode="email" placeholder="name@company.com or 98765 43210" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
+                    <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} onKeyDown={onLinkEnter} /></Field>
+                    <Field label="Vendor email or WhatsApp number"><input className={inputCls} inputMode="email" placeholder="name@company.com or 98765 43210" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} onKeyDown={onLinkEnter} /></Field>
                     <button type="button" className={btnPrimary} onClick={createLink} disabled={linkBusy || !reqName.trim() || !contactOk}>{linkBusy ? "Creating…" : "Create link"}</button>
                   </div>
                   {link && (
