@@ -177,10 +177,19 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
     } finally { setReading(false); }
   }
 
+  // One box: an email address or a WhatsApp number, whichever is handier.
+  const contactIsEmail = reqEmail.includes("@");
+  const waDigits = (() => {
+    if (contactIsEmail) return "";
+    let d = reqEmail.replace(/\D/g, "");
+    if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+    return d.length === 10 ? "91" + d : d; // a bare 10-digit number is taken as Indian
+  })();
+  const contactOk = contactIsEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(reqEmail.trim()) : waDigits.length >= 11 && waDigits.length <= 15;
   async function createLink() {
     setLinkBusy(true); setLinkError(null); setLink("");
     try {
-      const res = await fetch("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_name: reqName, contact_email: reqEmail }) });
+      const res = await fetch("/api/invites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contact_name: reqName, contact_email: contactIsEmail ? reqEmail.trim() : "" }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error ?? "Could not create the link");
       setLink(`${window.location.origin}/invite/${json.token}`);
@@ -305,16 +314,16 @@ export default function SubmitForm({ invite }: { invite?: InviteProps }) {
                 <div className="mt-3 rounded-lg bg-slate-50 p-3">
                   <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     <Field label="Vendor contact name"><input className={inputCls} value={reqName} onChange={(e) => setReqName(e.target.value)} /></Field>
-                    <Field label="Vendor email"><input className={inputCls} type="email" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
-                    <button type="button" className={btnPrimary} onClick={createLink} disabled={linkBusy || !reqName.trim() || !reqEmail.includes("@")}>{linkBusy ? "Creating…" : "Create link"}</button>
+                    <Field label="Vendor email or WhatsApp number"><input className={inputCls} inputMode="email" placeholder="name@company.com or 98765 43210" value={reqEmail} onChange={(e) => setReqEmail(e.target.value)} /></Field>
+                    <button type="button" className={btnPrimary} onClick={createLink} disabled={linkBusy || !reqName.trim() || !contactOk}>{linkBusy ? "Creating…" : "Create link"}</button>
                   </div>
                   {link && (
                     <div className="mt-3 space-y-2">
                       <input readOnly className={`${inputCls} mono text-xs`} value={link} onFocus={(e) => e.currentTarget.select()} />
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={btnSecondary} onClick={() => navigator.clipboard?.writeText(link)}>Copy link</button>
-                        <a className={btnPrimary} href={mailtoLink(reqEmail, inviteMessage(reqName, link))}>Open email</a>
-                        <a className="inline-flex items-center justify-center rounded-lg bg-[#25D366] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-white hover:bg-[#1fb857]" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${encodeURIComponent(plainText(inviteMessage(reqName, link).body))}`}>Send on WhatsApp</a>
+                        {contactIsEmail && <a className={btnPrimary} href={mailtoLink(reqEmail, inviteMessage(reqName, link))}>Open email</a>}
+                        <a className="inline-flex items-center justify-center rounded-lg bg-[#25D366] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-white hover:bg-[#1fb857]" target="_blank" rel="noreferrer" href={`https://wa.me/${waDigits}?text=${encodeURIComponent(plainText(inviteMessage(reqName, link).body))}`}>Send on WhatsApp</a>
                       </div>
                       <p className="text-xs text-slate-500">The vendor uploads the documents there and sees their own status. You will see them under Vendors.</p>
                     </div>

@@ -12,7 +12,8 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const name = String(body?.contact_name ?? "").trim().slice(0, 100);
   const email = String(body?.contact_email ?? "").trim().slice(0, 200);
-  if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Enter the vendor's name and a valid email." }, { status: 400 });
+  // The email is optional: a link can also be sent by WhatsApp. If one is given it must look like an email.
+  if (!name || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return NextResponse.json({ error: "Enter the vendor's name and, if you add an email, a valid one." }, { status: 400 });
   try {
     const invite = await getStore().createInvite({ contact_name: name, contact_email: email, created_by: g.session.name, days: INVITE_DAYS });
     const ref = String(body?.vendor_ref ?? "").trim();
