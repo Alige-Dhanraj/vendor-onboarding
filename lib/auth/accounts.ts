@@ -1,32 +1,45 @@
-// Three demo accounts, one per role. All names are fictional.
-// The shared password comes from the DEMO_PASSWORD environment variable and is never stored in the code or the repo.
+// Demo accounts. All names are fictional. For the demo every account accepts the password 12345.
+// (An extra DEMO_PASSWORD from the environment is accepted too.) Replace this before real use.
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { SessionUser } from "./session";
 
-export const ACCOUNTS: SessionUser[] = [
-  { email: "buyer@vendorgate.example", name: "Anita Sharma", role: "BUYER" },
-  { email: "reviewer@vendorgate.example", name: "Rohan Iyer", role: "REVIEWER" },
-  { email: "admin@vendorgate.example", name: "Meera Nair", role: "ADMIN" },
-  { email: "abcde", name: "Alige", role: "ADMIN" }, // quick sign-in for now; has its own fixed password below
+/** A sign-in account. People can type the email, the short login ID or the mobile number. */
+export interface Account extends SessionUser { id: string; phone: string }
+export const ACCOUNTS: Account[] = [
+  { email: "buyer@vendorgate.example", id: "buyer", phone: "9000000001", name: "Anita Sharma", role: "BUYER" },
+  { email: "reviewer@vendorgate.example", id: "reviewer", phone: "9000000002", name: "Rohan Iyer", role: "REVIEWER" },
+  { email: "admin@vendorgate.example", id: "admin", phone: "9000000003", name: "Meera Nair", role: "ADMIN" },
+  { email: "vendor@vendorgate.example", id: "vendor", phone: "9000000000", name: "Demo User", role: "ADMIN" }, // the one-line demo login: vendor / 12345
+  { email: "abcde", id: "abcde", phone: "", name: "Alige", role: "ADMIN" },
 ];
 
-// Accounts with their own password (the others share DEMO_PASSWORD). Temporary: replace before real use.
-const OWN_PASSWORD: Record<string, string> = { abcde: "12345" };
+/** Demo password, accepted for every account. DEMO_PASSWORD (if set) is accepted too. Replace before real use. */
+const DEMO_PASSWORD_PLAIN = "12345";
 
 function demoPassword(): string | null {
   const p = process.env.DEMO_PASSWORD;
-  if (p && p.length >= 8) return p;
-  return process.env.NODE_ENV === "production" ? null : "vendorgate-demo"; // local development only
+  return p && p.length >= 8 ? p : null;
+}
+
+/** The demo account behind each role, used by the demo role switcher. */
+export const accountForRole = (role: SessionUser["role"]) => ACCOUNTS.find((a) => a.role === role && a.id !== "vendor" && a.id !== "abcde")!;
+
+const strip = ({ email, name, role }: Account): SessionUser => ({ email, name, role });
+const lastTen = (s: string) => s.replace(/\D/g, "").slice(-10);
+export function findAccount(login: string): Account | undefined {
+  const x = (login ?? "").trim().toLowerCase();
+  if (!x) return undefined;
+  const digits = x.replace(/\D/g, "");
+  return ACCOUNTS.find((a) => a.email === x || a.id === x || (digits.length >= 10 && a.phone && lastTen(a.phone) === lastTen(digits)));
 }
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
 export type LoginResult = { ok: true; user: SessionUser } | { ok: false; reason: "not_configured" | "invalid" };
 
-export function checkLogin(email: string, password: string): LoginResult {
-  const user = ACCOUNTS.find((a) => a.email === (email ?? "").trim().toLowerCase());
-  const expected = (user && OWN_PASSWORD[user.email]) || demoPassword();
-  if (!expected) return { ok: false, reason: "not_configured" };
-  const match = timingSafeEqual(digest(password ?? ""), digest(expected));
-  return user && match ? { ok: true, user } : { ok: false, reason: "invalid" };
+export function checkLogin(login: string, password: string): LoginResult {
+  const user = findAccount(login);
+  const given = digest(password ?? "");
+  const match = [DEMO_PASSWORD_PLAIN, demoPassword()].filter((p): p is string => !!p).some((p) => timingSafeEqual(given, digest(p)));
+  return user && match ? { ok: true, user: strip(user) } : { ok: false, reason: "invalid" };
 }

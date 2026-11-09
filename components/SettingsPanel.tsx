@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ROLE_INFO } from "@/lib/auth/role-info";
+import RoleSwitch from "./RoleSwitch";
 import { Card, SectionTitle, btnSecondary, inputCls } from "./ui";
 
 export default function SettingsPanel({ users, accountingHost }: { users: { name: string; email: string; role: string }[]; accountingHost: string | null }) {
@@ -22,6 +24,23 @@ export default function SettingsPanel({ users, accountingHost }: { users: { name
           {saved && <span className="text-emerald-700">Saved</span>}
         </div>
         <Link href="/dashboard" className={`${btnSecondary} mt-4`}>Open the dashboard</Link>
+      </Card>
+
+      <Card className="p-5">
+        <SectionTitle hint="Demo only">View the app as another role</SectionTitle>
+        <p className="mb-3 text-sm text-slate-600">Switch between Buyer, Reviewer and Admin without signing out, to see what each one can do. You can also switch from the account menu at the top right, which stays available when you are a Buyer or Reviewer.</p>
+        <RoleSwitch />
+        <div className="mt-4 space-y-2">
+          {ROLE_INFO.map((r) => (
+            <details key={r.role} className="rounded-lg border border-slate-200">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">{r.label}<span className="ml-2 font-normal text-slate-500">{r.summary}</span></summary>
+              <div className="grid gap-4 px-4 pb-4 text-sm sm:grid-cols-2">
+                <div><div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">Can</div><ul className="space-y-1 text-slate-700">{r.can.map((t) => <li key={t}>✓ {t}</li>)}</ul></div>
+                <div><div className="mb-1 text-xs font-semibold uppercase tracking-wide text-rose-700">Cannot</div><ul className="space-y-1 text-slate-700">{r.cannot.map((t) => <li key={t}>✗ {t}</li>)}</ul></div>
+              </div>
+            </details>
+          ))}
+        </div>
       </Card>
 
       <Card className="p-5">

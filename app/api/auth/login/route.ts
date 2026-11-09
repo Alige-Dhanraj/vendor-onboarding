@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const notSet = (r.ok === false && r.reason === "not_configured");
   if (!r.ok) {
     await new Promise((res) => setTimeout(res, 600)); // slows down password guessing
-    return NextResponse.json({ error: notSet ? "Sign-in is not set up yet." : "Wrong email or password." }, { status: notSet ? 503 : 401 });
+    return NextResponse.json({ error: notSet ? "Sign-in is not set up yet." : "Wrong login ID or password." }, { status: notSet ? 503 : 401 });
   }
   const token = await createSessionToken(r.user);
   if (!token) return NextResponse.json({ error: "Sign-in is not set up yet." }, { status: 503 });
