@@ -213,7 +213,7 @@ function v5(ctx: CheckContext): CheckResult {
 
 function v6(ctx: CheckContext): CheckResult {
   const f = ctx.form;
-  const b: Base = { id: "V6", layer: "VALID", title: "Contact details format", checked: "Postal code, email and phone", rule: "V6: Indian pincode is 6 digits (or a US ZIP); email and phone must be well-formed." };
+  const b: Base = { id: "V6", layer: "VALID", title: "Contact details format", checked: "Postal code, email and phone", rule: "V6: Indian pincode is 6 digits (or a US ZIP); email and phone must be well-formed. Mobile numbers, landlines with an STD code and toll-free numbers are all accepted. Contact details are only checked for format. They are not compared with the documents, because a company can use a different number or email today than the one it registered with." };
   const issues: string[] = [];
   const pc = f.address.postal_code;
   if (pc && !(f.country === "US" ? isUsZip(pc) : isPincode(pc))) issues.push(`${f.country === "US" ? "ZIP code" : "pincode"} "${pc}"`);

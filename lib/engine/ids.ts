@@ -87,8 +87,12 @@ export const isPincode = (p: string) => /^[1-9][0-9]{5}$/.test((p ?? "").trim())
 export const isUsZip = (z: string) => /^\d{5}(-\d{4})?$/.test((z ?? "").trim());
 export const isEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((e ?? "").trim());
 export function isPhone(p: string, country: string): boolean {
-  const digits = (p ?? "").replace(/[^\d]/g, "");
-  if (country === "IN") return /^(91)?[6-9]\d{9}$/.test(digits);
+  const digits = (p ?? "").replace(/(ext\.?|extn\.?|x)\s*\d+\s*$/i, "").replace(/[^\d]/g, "");
+  if (country === "IN") {
+    // Mobile, landline with STD code (with or without 0 / +91), and 1800 toll-free numbers are all real business contacts.
+    const n = digits.replace(/^(0091|91|0)(?=\d{10,})/, "");
+    return /^([6-9]\d{9}|[1-5]\d{9}|1[89]00\d{6,7})$/.test(n);
+  }
   if (country === "US") return /^1?\d{10}$/.test(digits);
   return digits.length >= 8;
 }

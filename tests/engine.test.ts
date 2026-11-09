@@ -410,3 +410,9 @@ test("R5 never expires a PAN card, even if a date was wrongly read from it", asy
   const r5 = runChecks(ctx).find((r) => r.id === "R5")!;
   assert.notEqual(r5.status, "FAIL");
 });
+
+test("isPhone accepts real business numbers: mobile, landline with STD, +91, toll-free; rejects junk", async () => {
+  const { isPhone } = await import("../lib/engine/ids");
+  for (const p of ["98765 43210", "+91 98765 43210", "09876543210", "044-2345 6789", "+91 44 2345 6789", "020 2567 1234", "1800 123 4567", "044-23456789 ext 12"]) assert.equal(isPhone(p, "IN"), true, p);
+  for (const p of ["12345", "0000000000", "98765", "abcdefghij", ""]) assert.equal(isPhone(p, "IN"), false, p);
+});
